@@ -17,7 +17,6 @@
 using NumSharp;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using static Tensorflow.Binding;
 
@@ -54,7 +53,7 @@ namespace Tensorflow
 #else
         #region Compute
 
-
+        public static Tensor operator +(Tensor lhs, ResourceVariable rhs) => BinaryOpWrapper("add", lhs, rhs);
         public static Tensor operator +(Tensor lhs, Tensor rhs) => BinaryOpWrapper("add", lhs, rhs);
         public static Tensor operator +(Tensor lhs, NDArray rhs) => BinaryOpWrapper("add", lhs, rhs);
         public static Tensor operator +(NDArray lhs, Tensor rhs) => BinaryOpWrapper("add", lhs, rhs);
@@ -130,7 +129,7 @@ namespace Tensorflow
         public static Tensor operator *(double lhs, Tensor rhs) => BinaryOpWrapper("mul", lhs, rhs);
         public static Tensor operator *(Tensor lhs, Complex rhs) => BinaryOpWrapper("mul", lhs, rhs);
         public static Tensor operator *(Complex lhs, Tensor rhs) => BinaryOpWrapper("mul", lhs, rhs);
-        public static Tensor operator /(Tensor lhs, Tensor rhs) => BinaryOpWrapper("div", lhs, rhs);
+        public static Tensor operator /(Tensor lhs, Tensor rhs) => BinaryOpWrapper("truediv", lhs, rhs);
         public static Tensor operator /(Tensor lhs, NDArray rhs) => BinaryOpWrapper("div", lhs, rhs);
         public static Tensor operator /(NDArray lhs, Tensor rhs) => BinaryOpWrapper("div", lhs, rhs);
         public static Tensor operator /(Tensor lhs, sbyte rhs) => BinaryOpWrapper("div", lhs, rhs);
@@ -295,7 +294,7 @@ namespace Tensorflow
         {
             bool is_floating = false;
             var types = new List<bool>();
-            
+
             if (x is Tensor t1)
                 types.add(t1.dtype.is_floating());
 
@@ -312,12 +311,14 @@ namespace Tensorflow
             TF_DataType dtype = TF_DataType.DtInvalid;
 
             if (x is Tensor tl)
+            {
                 dtype = tl.dtype.as_base_dtype();
-            if (y is Tensor tr)
-                dtype = tr.dtype.as_base_dtype();
+            }
 
-            if (name == "div")
-                name = div_or_truediv(name, x, y);
+            if (y is Tensor tr)
+            {
+                dtype = tr.dtype.as_base_dtype();
+            }
 
             return tf_with(ops.name_scope(null, name, new { x, y }), scope =>
             {
@@ -328,7 +329,7 @@ namespace Tensorflow
                 switch (name.ToLowerInvariant())
                 {
                     case "add":
-                        result = math_ops.add(x1, y1, name: scope);
+                        result = math_ops.add_v2(x1, y1, name: scope);
                         break;
                     case "div":
                         result = math_ops.div(x1, y1, name: scope);
@@ -340,7 +341,7 @@ namespace Tensorflow
                         result = math_ops.truediv(x1, y1, name: scope);
                         break;
                     case "mul":
-                        result = gen_math_ops.mul(x1, y1, name: scope);
+                        result = math_ops.multiply(x1, y1, name: scope);
                         break;
                     case "sub":
                         result = gen_math_ops.sub(x1, y1, name: scope);

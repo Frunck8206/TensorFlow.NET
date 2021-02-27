@@ -17,8 +17,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
-using System.Runtime.InteropServices;
 using static Tensorflow.Binding;
 
 namespace Tensorflow
@@ -76,9 +76,7 @@ namespace Tensorflow
     /// </summary>
     /// <remarks>https://www.tensorflow.org/guide/graphs <br></br>https://www.tensorflow.org/api_docs/python/tf/Graph</remarks>
     public partial class Graph : DisposableObject
-#if !SERIALIZABLE
         , IEnumerable<Operation>
-#endif
     {
         private Dictionary<int, ITensorOrOperation> _nodes_by_id;
         public Dictionary<string, ITensorOrOperation> _nodes_by_name;
@@ -89,7 +87,7 @@ namespace Tensorflow
         private List<Tensor> _unfeedable_tensors = new List<Tensor>();
 
         public string _name_stack = "";
-        private string _graph_key;
+        protected string _graph_key;
         public string graph_key => _graph_key;
         public string _last_loss_reduction;
         public bool _is_loss_scaled_by_optimizer { get; set; }
@@ -107,6 +105,9 @@ namespace Tensorflow
 
         public bool building_function;
 
+        string _container = "";
+        public string Container => _container;
+
         int _seed;
         public int seed
         {
@@ -116,6 +117,9 @@ namespace Tensorflow
                 _seed = value;
             }
         }
+
+        protected Graph outer_graph;
+        public Graph OuterGraph => outer_graph;
 
         public Graph()
         {
@@ -142,10 +146,12 @@ namespace Tensorflow
 
         /// <summary>
         /// Returns a context manager that makes this `Graph` the default graph.
+        /// Must call Exit() to pop graph
         /// </summary>
         /// <returns></returns>
-        public Graph as_default()
+        public virtual Graph as_default()
         {
+            tf.Context.graph_mode(isFunc: false);
             return ops.set_default_graph(this);
         }
 
@@ -153,6 +159,8 @@ namespace Tensorflow
         {
             if (obj is RefVariable var)
                 return var._as_graph_element();
+            else if (obj is ResourceVariable resVar)
+                return resVar.GraphElement;
 
             return null;
         }
@@ -259,9 +267,10 @@ namespace Tensorflow
                 throw new RuntimeError("Graph is finalized and cannot be modified.");
         }
 
-        public Operation create_op(string op_type, Tensor[] inputs, TF_DataType[] dtypes,
+        public virtual Operation create_op(string op_type, Tensor[] inputs, TF_DataType[] dtypes,
             TF_DataType[] input_types = null, string name = null,
-            Dictionary<string, AttrValue> attrs = null, OpDef op_def = null)
+            Dictionary<string, AttrValue> attrs = null, OpDef op_def = null,
+            bool compute_device = true)
         {
             if (inputs == null)
                 inputs = new Tensor[0];
@@ -272,7 +281,7 @@ namespace Tensorflow
             // If a names ends with a '/' it is a "name scope" and we use it as-is,
             // after removing the trailing '/'.
             name = name.EndsWith("/") ? ops.name_from_scope_name(name) : unique_name(name);
-            var node_def = ops._NodeDef(op_type, name, device: "", attrs: attrs);
+            var node_def = ops._NodeDef(op_type, name, attrs: attrs);
 
             var input_ops = inputs.Select(x => x.op).ToArray();
             var control_inputs = _control_dependencies_for_inputs(input_ops);
@@ -286,20 +295,14 @@ namespace Tensorflow
                 original_op: null,
                 op_def: op_def);
 
-            _create_op_helper(op, true);
-
-            /*Console.Write($"create_op: {op_type} '{node_def.Name}'");
-            Console.Write($", inputs: {(inputs.Length == 0 ? "empty" : String.Join(", ", inputs.Select(x => x.name)))}");
-            Console.Write($", control_inputs: {(control_inputs.Length == 0 ? "empty" : String.Join(", ", control_inputs.Select(x => x.name)))}");
-            Console.Write($", outputs: {(op.outputs.Length == 0 ? "empty" : String.Join(", ", op.outputs.Select(x => x.name)))}");
-            Console.WriteLine();*/
+            _create_op_helper(op, compute_device);
 
             return op;
         }
 
         public void device(string device_name)
         {
-            throw new NotImplementedException("");
+            
         }
 
         private void _create_op_helper(Operation op, bool compute_device = true)
@@ -415,7 +418,7 @@ namespace Tensorflow
             return name;
         }
 
-        public TF_Output[] ReturnOutputs(IntPtr results)
+        public TF_Output[] ReturnOutputs(SafeImportGraphDefResultsHandle results)
         {
             IntPtr return_output_handle = IntPtr.Zero;
             int num_return_outputs = 0;
@@ -446,7 +449,7 @@ namespace Tensorflow
             var collection = _collections.ContainsKey(name) ? _collections[name] : new List<T>();
             switch (collection)
             {
-                case List<VariableV1> list:
+                case List<IVariableV1> list:
                     t = list.Select(x => (T)(object)x).ToList();
                     break;
                 case List<ResourceVariable> list:
@@ -486,7 +489,7 @@ namespace Tensorflow
 
         protected override void DisposeManagedResources()
         {
-            ops.default_graph_stack.remove(this);
+            
         }
 
         protected override void DisposeUnmanagedResources(IntPtr handle)
@@ -514,24 +517,30 @@ namespace Tensorflow
 
         public TensorShape GetTensorShape(TF_Output output)
         {
-            var status = new Status();
-            var ndim = c_api.TF_GraphGetTensorNumDims(_handle, output, status);
+            var status = tf.Status;
+            var ndim = c_api.TF_GraphGetTensorNumDims(_handle, output, status.Handle);
             status.Check();
 
             if (ndim == -1)
                 return new TensorShape();
 
             var dims = new long[ndim];
-            c_api.TF_GraphGetTensorShape(_handle, output, dims, dims.Length, status);
+            c_api.TF_GraphGetTensorShape(_handle, output, dims, dims.Length, status.Handle);
             status.Check();
 
             return new TensorShape(dims.Select(x => (int)x).ToArray());
         }
 
+        public virtual void Exit()
+        {
+            tf.Context.restore_mode();
+            ops.pop_graph();
+        }
+
         string debugString = string.Empty;
         public override string ToString()
         {
-            return $"{graph_key}, ({_handle})";
+            return $"{graph_key}, 0x{_handle.ToString("x16")}";
             /*if (string.IsNullOrEmpty(debugString))
             {
                 int len = 0;
@@ -541,7 +550,6 @@ namespace Tensorflow
             return debugString;*/
         }
 
-#if !SERIALIZABLE
         private IEnumerable<Operation> GetEnumerable()
             => c_api_util.tf_operations(this);
 
@@ -550,7 +558,6 @@ namespace Tensorflow
 
         IEnumerator IEnumerable.GetEnumerator()
             => throw new NotImplementedException();
-#endif
 
         public static implicit operator IntPtr(Graph graph)
         {

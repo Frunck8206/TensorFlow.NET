@@ -15,7 +15,6 @@
 ******************************************************************************/
 
 using Tensorflow.Operations;
-using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
@@ -31,7 +30,7 @@ namespace Tensorflow
         /// </summary>
         public void _control_flow_post_processing()
         {
-            foreach(Tensor input_tensor in inputs)
+            foreach (Tensor input_tensor in inputs)
                 control_flow_util.CheckInputFromValidContext(this, input_tensor.op);
 
             if (_control_flow_context != null)
@@ -40,8 +39,8 @@ namespace Tensorflow
 
         public void _add_control_input(Operation op)
         {
-            //c_api.TF_AddControlInput(_operDesc, op);
-            c_api.AddControlInput(graph, _handle, op);
+            c_api.TF_AddControlInput(OpDesc, op);
+            //c_api.AddControlInput(graph, _handle, op);
         }
 
         public void _add_control_inputs(Operation[] ops)

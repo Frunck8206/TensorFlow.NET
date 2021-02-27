@@ -22,24 +22,13 @@ namespace Tensorflow.Operations.Initializers
             string mode = "FAN_AVG",
             bool uniform = true,
             int? seed = null,
-            TF_DataType dtype = TF_DataType.TF_FLOAT) : base(factor: scale, 
-                mode: mode, 
+            TF_DataType dtype = TF_DataType.TF_FLOAT) : base(factor: scale,
+                mode: mode,
                 uniform: uniform,
-                seed: seed, 
+                seed: seed,
                 dtype: dtype)
         {
 
-        }
-
-        public object get_config()
-        {
-            return new
-            {
-                scale = _scale,
-                mode = _mode,
-                seed = _seed,
-                dtype = _dtype
-            };
         }
     }
 }

@@ -17,38 +17,25 @@
 using System;
 using System.Linq;
 using System.Runtime.InteropServices;
-#if SERIALIZABLE
-using Newtonsoft.Json;
-#endif
 using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
     public partial class Operation
     {
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
         public int NumOutputs => c_api.TF_OperationNumOutputs(_handle);
         public TF_DataType OutputType(int index) => c_api.TF_OperationOutputType(_tf_output(index));
 
         public int OutputListLength(string name)
         {
-            int num = 0;
-            using (var status = new Status())
-            {
-                num = c_api.TF_OperationOutputListLength(_handle, name, status);
-                status.Check(true);
-            }
+            int num = c_api.TF_OperationOutputListLength(_handle, name, tf.Status.Handle);
+            tf.Status.Check(true);
 
             return num;
         }
 
-        private Tensor[] _outputs;
-        public Tensor[] outputs => _outputs;
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
+        protected Tensor[] _outputs;
+        public virtual Tensor[] outputs => _outputs;
         public Tensor output => _outputs.FirstOrDefault();
 
         public int NumControlOutputs => c_api.TF_OperationNumControlOutputs(_handle);
@@ -60,9 +47,6 @@ namespace Tensorflow
         /// <summary>
         /// List this operation's output types.
         /// </summary>
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
         public TF_DataType[] _output_types
         {
             get
@@ -79,7 +63,7 @@ namespace Tensorflow
             var handle = Marshal.AllocHGlobal(Marshal.SizeOf<TF_Input>());
             int num = c_api.TF_OperationOutputConsumers(new TF_Output(_handle, index), handle, max_consumers);
             var consumers = new TF_Input[num];
-            var inputptr = (TF_Input*) handle;
+            var inputptr = (TF_Input*)handle;
             for (int i = 0; i < num; i++)
                 consumers[i] = *(inputptr + i);
 

@@ -26,8 +26,8 @@ namespace Tensorflow
 
         public class nn_internal
         {
-            public Tensor conv2d(Tensor input, RefVariable filter, int[] strides, string padding, bool use_cudnn_on_gpu = true, 
-                string data_format= "NHWC", int[] dilations= null, string name = null)
+            public Tensor conv2d(Tensor input, IVariableV1 filter, int[] strides, string padding, bool use_cudnn_on_gpu = true,
+                string data_format = "NHWC", int[] dilations = null, string name = null)
             {
                 var parameters = new Conv2dParams
                 {
@@ -65,8 +65,7 @@ namespace Tensorflow
                 Tensor keep = null;
                 if (keep_prob != null)
                     keep = 1.0f - keep_prob;
-                var rate_tensor = keep;
-
+                var rate_tensor = rate.HasValue ? tf.constant(rate.Value) : keep;
                 return nn_ops.dropout_v2(x, rate: rate_tensor, noise_shape: noise_shape, seed: seed, name: name);
             }
 
@@ -92,12 +91,12 @@ namespace Tensorflow
             public (Tensor, Tensor) moments(Tensor x,
                 int[] axes,
                 string name = null,
-                bool keep_dims = false) => nn_impl.moments(x, 
-                    axes, 
-                    name: name, 
+                bool keep_dims = false) => nn_impl.moments(x,
+                    axes,
+                    name: name,
                     keep_dims: keep_dims);
 
-            public Tensor embedding_lookup(RefVariable @params,
+            public Tensor embedding_lookup(IVariableV1 @params,
                 Tensor ids,
                 string partition_strategy = "mod",
                 string name = null) => embedding_ops._embedding_lookup_and_transform(@params,
@@ -117,25 +116,30 @@ namespace Tensorflow
             public IActivation swish() => new swish();
             public IActivation tanh() => new tanh();
 
-            public Tensor relu(Tensor features, string name = null) => gen_nn_ops.relu(features, name);
+            public IActivation softmax() => new softmax();
+            public Tensor tanh(Tensor x, string name = null)
+                => gen_nn_ops.tanh(x, name);
+
+            public Tensor relu(Tensor features, string name = null)
+                => gen_nn_ops.relu(features, name);
 
             public Tensor[] fused_batch_norm(Tensor x,
-                VariableV1 scale,
-                VariableV1 offset,
-                Tensor mean = null,
-                Tensor variance = null,
+                IVariableV1 scale,
+                IVariableV1 offset,
+                IVariableV1 mean = null,
+                IVariableV1 variance = null,
                 float epsilon = 0.001f,
                 string data_format = "NHWC",
                 bool is_training = true,
-                string name = null) => nn_impl.fused_batch_norm(x, scale, offset, mean, variance,
+                string name = null,
+                float exponential_avg_factor = 1.0f) => nn_impl.fused_batch_norm(x, scale, offset, mean, variance,
                     epsilon: epsilon,
                     data_format: data_format,
                     is_training: is_training,
-                    name: name);
+                    name: name,
+                    exponential_avg_factor: exponential_avg_factor);
 
-            public IPoolFunction max_pool_fn => new MaxPoolFunction();
-
-            public Tensor max_pool(Tensor value, int[] ksize, int[] strides, string padding, string data_format = "NHWC", string name = null) 
+            public Tensor max_pool(Tensor value, int[] ksize, int[] strides, string padding, string data_format = "NHWC", string name = null)
                 => nn_ops.max_pool(value, ksize, strides, padding, data_format: data_format, name: name);
 
             public Tensor in_top_k(Tensor predictions, Tensor targets, int k, string name = "InTopK")
@@ -144,7 +148,7 @@ namespace Tensorflow
             public Tensor[] top_k(Tensor input, int k = 1, bool sorted = true, string name = null)
                 => gen_nn_ops.top_kv2(input, k: k, sorted: sorted, name: name);
 
-            public Tensor bias_add(Tensor value, RefVariable bias, string data_format = null, string name = null)
+            public Tensor bias_add(Tensor value, IVariableV1 bias, string data_format = null, string name = null)
             {
                 return tf_with(ops.name_scope(name, "BiasAdd", new { value, bias }), scope =>
                 {
@@ -179,6 +183,7 @@ namespace Tensorflow
             public Tensor softmax(Tensor logits, int axis = -1, string name = null)
                 => gen_nn_ops.softmax(logits, name);
 
+
             /// <summary>
             /// Computes sparse softmax cross entropy between `logits` and `labels`.
             /// </summary>
@@ -212,6 +217,14 @@ namespace Tensorflow
             public Tensor softmax_cross_entropy_with_logits_v2(Tensor labels, Tensor logits, int axis = -1, string name = null)
                 => nn_ops.softmax_cross_entropy_with_logits_v2_helper(labels, logits, axis: axis, name: name);
 
+            /// <summary>
+            /// Computes sigmoid of `x` element-wise.
+            /// Specifically, `y = 1 / (1 + exp(-x))`.
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            /// <param name="x"></param>
+            /// <param name="name">A name for the operation (optional).</param>
+            /// <returns>A Tensor with the same type as `x`.</returns>
             public Tensor sigmoid<T>(T x, string name = null)
                 => math_ops.sigmoid(x, name: name);
         }

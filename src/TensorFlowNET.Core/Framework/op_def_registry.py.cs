@@ -15,29 +15,39 @@
 ******************************************************************************/
 
 using System.Collections.Generic;
-using System.IO;
 using Tensorflow.Util;
 
 namespace Tensorflow
 {
     public class op_def_registry
     {
-        private static Dictionary<string, OpDef> _registered_ops;
+        static Dictionary<string, OpDef> _registered_ops = new Dictionary<string, OpDef>();
 
         public static Dictionary<string, OpDef> get_registered_ops()
         {
-            if(_registered_ops == null)
+            if (_registered_ops.Count == 0)
             {
-                _registered_ops = new Dictionary<string, OpDef>();
-                using (var buffer = new Buffer(c_api.TF_GetAllOpList()))
+                lock (_registered_ops)
                 {
-                    var op_list = OpList.Parser.ParseFrom(buffer.MemoryBlock.Stream());
+                    // double validation to avoid multi-thread executing
+                    if (_registered_ops.Count > 0)
+                        return _registered_ops;
+
+                    using var buffer = new Buffer(c_api.TF_GetAllOpList());
+                    using var stream = buffer.DangerousMemoryBlock.Stream();
+                    var op_list = OpList.Parser.ParseFrom(stream);
                     foreach (var op_def in op_list.Op)
                         _registered_ops[op_def.Name] = op_def;
                 }
             }
 
             return _registered_ops;
+        }
+
+        public static OpDef GetOpDef(string type)
+        {
+            var ops = get_registered_ops();
+            return ops[type];
         }
     }
 }

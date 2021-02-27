@@ -24,6 +24,9 @@ namespace Tensorflow
         public Tensor compute_weighted_loss(Tensor losses, Tensor weights = null, string scope = null,
             string loss_collection = "losses", string reduction = Reduction.SUM_BY_NONZERO_WEIGHTS)
         {
+            if (weights == null)
+                weights = tf.constant(1.0f);
+
             return tf_with(ops.name_scope(scope, default_name: "weighted_loss", (losses, weights)), delegate
             {
                 // Save the `reduction` argument for loss normalization when distributing
@@ -47,7 +50,7 @@ namespace Tensorflow
                 else
                 {
                     loss = math_ops.reduce_sum(weighted_losses);
-                    if (reduction == Reduction.MEAN)
+                    if (reduction == Reduction.WEIGHTED_MEAN)
                         loss = _safe_mean(
                             loss, math_ops.reduce_sum(array_ops.ones_like(losses) * weights));
                     else if (reduction == Reduction.SUM_BY_NONZERO_WEIGHTS ||
@@ -97,11 +100,11 @@ namespace Tensorflow
             });
         }
 
-        public Tensor sparse_softmax_cross_entropy(Tensor labels, 
+        public Tensor sparse_softmax_cross_entropy(Tensor labels,
             Tensor logits,
             float weights = 1.0f,
             string scope = null,
-            string loss_collection= "losses",
+            string loss_collection = "losses",
             string reduction = Reduction.SUM_BY_NONZERO_WEIGHTS)
         {
             return tf_with(ops.name_scope(scope,
@@ -129,7 +132,7 @@ namespace Tensorflow
             (labels, predictions) = confusion_matrix.remove_squeezable_dimensions(
                 labels, predictions, expected_rank_diff: expected_rank_diff);
 
-            if(weights > 0)
+            if (weights > 0)
             {
                 var weights_tensor = ops.convert_to_tensor(weights);
                 var labels_rank = labels.TensorShape.ndim;

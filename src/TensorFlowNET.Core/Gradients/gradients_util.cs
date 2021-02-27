@@ -17,6 +17,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Tensorflow.Graphs;
 using Tensorflow.Operations.ControlFlows;
 using static Tensorflow.Binding;
 
@@ -39,7 +40,14 @@ namespace Tensorflow
 
             // If src_graph is a _FuncGraph (i.e. a function body), gather it and all
             // ancestor graphs. This is necessary for correctly handling captured values.
+            var func_graphs = new List<FuncGraph>();
             var curr_graph = src_graph;
+            if (src_graph is FuncGraph func_graph)
+            {
+                func_graphs.append(func_graph);
+                curr_graph = func_graph.OuterGraph;
+            }
+                
 
             if (stop_gradients == null)
                 stop_gradients = new Tensor[0];
@@ -47,13 +55,13 @@ namespace Tensorflow
                 grad_ys = new Tensor[ys.Length];
 
             // Iterate over the collected ops.
-            /**
+            /*
              * grads: op => list of gradients received on each output endpoint of the
              * op.  The gradients for each endpoint are initially collected as a list.
              * When it is time to call the op's gradient function, for each endpoint we
              * aggregate the list of received gradients into a Add() Operation if there
              * is more than one.
-             **/
+             */
             var grads = new Dictionary<string, List<List<Tensor>>>();
             Operation[] reachable_to_ops = null;
             ControlFlowState loop_state = null;
@@ -70,21 +78,21 @@ namespace Tensorflow
                     xs = ops.internal_convert_n_to_tensor_or_indexed_slices(xs, name: "x", as_ref: true);
                     grad_ys = _DefaultGradYs(grad_ys, ys, colocate_gradients_with_ops, gradient_uid);
 
-                    /** 
+                    /*
                      * The approach we take here is as follows: Create a list of all ops in the
                      * subgraph between the ys and xs.  Visit these ops in reverse order of ids
                      * to ensure that when we visit an op the gradients w.r.t its outputs have
                      * been collected.  Then aggregate these gradients if needed, call the op's
                      * gradient function, and add the generated gradients to the gradients for
                      * its input.
-                     **/
+                     */
 
                     // Initialize the pending count for ops in the connected subgraph from ys
                     // to the xs.
                     var to_ops = ys.Select(x => x.op).ToList();
                     var from_ops = xs.Select(x => x.op).ToList();
                     var stop_gradient_ops = stop_gradients.Select(x => x.op).ToList();
-                    (reachable_to_ops, pending_count, loop_state) = _PendingCount(to_ops, from_ops, colocate_gradients_with_ops, new List<object>(), xs);
+                    (reachable_to_ops, pending_count, loop_state) = _PendingCount(to_ops, from_ops, colocate_gradients_with_ops, func_graphs , xs);
 
                     // Add the initial gradients for the ys.
                     foreach (var (y, grad_y) in zip(ys, grad_ys))
@@ -108,10 +116,10 @@ namespace Tensorflow
                         }
                     }
 
-                    if(loop_state != null)
+                    if (loop_state != null)
                     {
                         var loop_exits = loop_state.ProcessUnusedLoopExits(pending_count, to_ops_set);
-                        foreach(var y in loop_exits)
+                        foreach (var y in loop_exits)
                         {
                             //if(IsTrainable(y))
                             throw new NotImplementedException("");
@@ -236,7 +244,7 @@ namespace Tensorflow
                             if (loop_state != null)
                                 loop_state.ExitGradWhileContext(op, before: false);
                         }
-                        
+
                         // Update pending count for the inputs of op and enqueue ready ops.
                         _UpdatePendingAndEnqueueReady(grads, op, queue, pending_count, loop_state, xs);
                     }
@@ -258,11 +266,8 @@ namespace Tensorflow
         {
             var new_grad_ys = new List<Tensor>();
 
-            for (int i = 0; i < grad_ys.Length; i++)
+            foreach(var (i, (y, grad_y)) in enumerate(zip(ys, grad_ys)))
             {
-                var grad_y = grad_ys[i];
-                var y = ys[i];
-
                 _maybe_colocate_with(y.op, gradient_uid, colocate_gradients_with_ops);
 
                 if (grad_y == null)
@@ -272,8 +277,17 @@ namespace Tensorflow
                     var shape = array_ops.shape(y);
                     var constant = constant_op.constant(y.dtype == TF_DataType.TF_DOUBLE ? (object)1.0 : (object)1.0f, name: $"grad_ys_{i}");
                     var fill = gen_array_ops.fill(shape, constant);
-                    new_grad_ys.Add(fill);
+                    new_grad_ys.append(fill);
+                    continue;
                 }
+
+                if (y.dtype.is_floating() || y.dtype.is_integer())
+                {
+
+                }
+
+                // Create a grad_y tensor in the name scope of the gradient.
+                new_grad_ys.append(array_ops.identity(grad_y, name: $"grad_ys_{i}"));
             }
 
             return new_grad_ys.ToArray();
@@ -294,7 +308,11 @@ namespace Tensorflow
         /// <param name="colocate_gradients_with_ops"></param>
         /// <param name="func_graphs"></param>
         /// <param name="xs"></param>
-        private static (Operation[], Dictionary<string, int>, ControlFlowState) _PendingCount(List<Operation> to_ops, List<Operation> from_ops, bool colocate_gradients_with_ops, List<object> func_graphs, Tensor[] xs)
+        private static (Operation[], Dictionary<string, int>, ControlFlowState) _PendingCount(List<Operation> to_ops, 
+            List<Operation> from_ops, 
+            bool colocate_gradients_with_ops, 
+            List<FuncGraph> func_graphs, 
+            Tensor[] xs)
         {
             // Mark reachable ops from from_ops.
             var reached_ops = new List<Operation>();
@@ -311,6 +329,7 @@ namespace Tensorflow
             while (queue.Count > 0)
             {
                 var op = queue.Dequeue();
+
                 if (reached_ops.Contains(op))
                 {
                     between_ops.Add(op);
@@ -375,7 +394,7 @@ namespace Tensorflow
                 yield return op.inputs[i];
         }
 
-        private static List<List<Tensor>> _AggregatedGrads(Dictionary<string, List<List<Tensor>>> grads, Operation op, string gradient_uid, 
+        private static List<List<Tensor>> _AggregatedGrads(Dictionary<string, List<List<Tensor>>> grads, Operation op, string gradient_uid,
             ControlFlowState loop_state, int aggregation_method = 0)
         {
             var out_grads = _GetGrads(grads, op);
@@ -384,8 +403,8 @@ namespace Tensorflow
             {
                 if (loop_state != null)
                 {
-                    if (out_grads.Count > 1 && 
-                        out_grads[1].Count > 0 && 
+                    if (out_grads.Count > 1 &&
+                        out_grads[1].Count > 0 &&
                         control_flow_util.IsLoopSwitch(op))
                         continue;
                 }
@@ -393,7 +412,9 @@ namespace Tensorflow
                 // Aggregate multiple gradients, and convert [] to None.
                 if (out_grad.Count > 0)
                 {
+#pragma warning disable CS0219 // Variable is assigned but its value is never used
                     string used = "";
+#pragma warning restore CS0219 // Variable is assigned but its value is never used
                     if (out_grad.Count < 2)
                     {
                         used = "nop";
@@ -508,7 +529,7 @@ namespace Tensorflow
         /// <param name="from_ops"></param>
         /// <param name="reached_ops"></param>
         /// <param name="func_graphs"></param>
-        private static void _MarkReachedOps(List<Operation> from_ops, List<Operation> reached_ops, List<object> func_graphs)
+        private static void _MarkReachedOps(List<Operation> from_ops, List<Operation> reached_ops, List<FuncGraph> func_graphs)
         {
             Queue<Operation> queue = new Queue<Operation>(from_ops);
             while (queue.Count > 0)
@@ -535,7 +556,7 @@ namespace Tensorflow
         /// </summary>
         /// <param name="t"></param>
         /// <param name="func_graphs"></param>
-        private static Operation[] _Consumers(Tensor t, List<object> func_graphs)
+        private static Operation[] _Consumers(Tensor t, List<FuncGraph> func_graphs)
         {
             return t.consumers();
         }
@@ -607,7 +628,7 @@ namespace Tensorflow
                         if (grad_state.pending_exits_count == 0)
                         {
                             var has_not_none_grad = false;
-                            foreach(var y in grad_state.deferred_exits)
+                            foreach (var y in grad_state.deferred_exits)
                             {
                                 if (_HasAnyNotNoneGrads(grads, y.op))
                                 {
@@ -644,7 +665,7 @@ namespace Tensorflow
             }
         }
 
-        private static bool IsTrainable(Tensor tensor)
+        public static bool IsTrainable(Tensor tensor)
         {
             var dtype = tensor.dtype.as_base_dtype();
             return new TF_DataType[] { dtypes.float16, dtypes.float32, dtypes.float64,
@@ -661,7 +682,7 @@ namespace Tensorflow
         private static bool _HasAnyNotNoneGrads(Dictionary<string, List<List<Tensor>>> grads, Operation op)
         {
             var out_grads = _GetGrads(grads, op);
-            foreach(var out_grad in out_grads)
+            foreach (var out_grad in out_grads)
             {
                 if (out_grad.Exists(g => g != null))
                     return true;

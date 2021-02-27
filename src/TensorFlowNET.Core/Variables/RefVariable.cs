@@ -15,6 +15,7 @@
 ******************************************************************************/
 
 using Google.Protobuf;
+using NumSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,24 +23,37 @@ using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
-    public partial class RefVariable : VariableV1, IProtoBuf<VariableDef, RefVariable>
+    [Obsolete]
+    public partial class RefVariable : IVariableV1, IProtoBuf<VariableDef, RefVariable>
     {
+        protected string _name;
+        public string UniqueId => _name;
+        public Tensor GraphElement { get; }
+        public Tensor _variable;
+        public Tensor Handle => _variable;
+        protected string _graph_key;
+        public Graph Graph => _variable.graph;
+
+        public Tensor _is_initialized_op { get; set; }
+
+        protected TF_DataType _dtype;
+
         public bool _in_graph_mode = true;
         public Tensor _initial_value;
-        public string _graph_key;
         public bool _trainable;
-        
+
         public Tensor _snapshot;
         public bool _save_slice_info;
 
         private Operation _initializer_op;
-        public override Operation initializer => _initializer_op;
-        public override Operation op => _variable.op;
-        
+        public Operation Initializer => _initializer_op;
+        public Operation Op => _variable.op;
+
         public TF_DataType dtype => _variable.dtype;
         public TensorShape shape => tensor_util.to_shape(_variable.shape);
+        public string Device => "";
 
-        public override string name => _variable.name;
+        public string Name => _variable.name;
 
         public Tensor eval() => _variable;
 
@@ -51,17 +65,15 @@ namespace Tensorflow
             string name = null,
             VariableDef variable_def = null,
             TF_DataType dtype = TF_DataType.DtInvalid,
-            string import_scope = "") : base(initial_value,
-                    trainable,
-                    collections,
-                    validate_shape,
-                    caching_device,
-                    name,
-                    dtype)
+            string import_scope = "") : base()
         {
             _in_graph_mode = true;
 
-            if (variable_def != null)
+            if (initial_value is Operation op)
+            {
+                _init_from_op(op);
+            }
+            else if (variable_def != null)
             {
                 if (initial_value != null)
                     throw new ValueError("variable_def and initial_value are mutually exclusive.");
@@ -71,6 +83,13 @@ namespace Tensorflow
             {
                 _init_from_args(initial_value, trainable, collections, validate_shape, caching_device, name, dtype);
             }
+        }
+
+        private void _init_from_op(Operation op)
+        {
+            var g = ops.get_default_graph();
+            _initializer_op = op;
+            _variable = op.output;
         }
 
         private void _init_from_proto(VariableDef variable_def, string import_scope = "")
@@ -101,7 +120,9 @@ namespace Tensorflow
             if (variable_def.SaveSliceInfoDef != null)
                 throw new NotImplementedException("save_slice_info_def");
             else
+#pragma warning disable CS0642 // Possible mistaken empty statement
                 ;// _save_slice_info = null;
+#pragma warning restore CS0642 // Possible mistaken empty statement
 
             //_caching_device = null;
             //_constraint = null;
@@ -120,7 +141,7 @@ namespace Tensorflow
 
             var init_from_fn = initial_value.GetType().Name == "Func`1";
 
-            if(collections == null)
+            if (collections == null)
             {
                 collections = new List<string> { tf.GraphKeys.GLOBAL_VARIABLES };
             }
@@ -133,7 +154,7 @@ namespace Tensorflow
             if (trainable && !collections.Contains(tf.GraphKeys.TRAINABLE_VARIABLES))
                 collections.Add(tf.GraphKeys.TRAINABLE_VARIABLES);
 
-            tf_with(ops.init_scope2(), delegate
+            tf_with(ops.init_scope(), init_scope =>
             {
                 var values = init_from_fn ? new object[0] : new object[] { initial_value };
                 tf_with(ops.name_scope(name, "Variable", values), scope =>
@@ -194,7 +215,7 @@ namespace Tensorflow
                         _snapshot = gen_array_ops.identity(_variable, name = "read");
                     }
 
-                    ops.add_to_collections(collections, this as VariableV1);
+                    ops.add_to_collections(collections, this as IVariableV1);
                 });
             });
         }
@@ -203,7 +224,7 @@ namespace Tensorflow
 
         public Tensor value() => _snapshot;
 
-        public Tensor _AsTensor() => _snapshot;
+        public Tensor AsTensor(TF_DataType dtype = TF_DataType.DtInvalid, string name = null, bool as_ref = false) => _snapshot;
 
         public Tensor _as_graph_element() => _variable;
 
@@ -234,7 +255,7 @@ namespace Tensorflow
         {
             var op = tensor.op;
             var new_op = op_cache.ContainsKey(op.name) ? op_cache[op.name] : null;
-            if(new_op == null)
+            if (new_op == null)
             {
                 new_op = _safe_initial_value_from_op(name, op, op_cache);
                 op_cache[op.name] = new_op;
@@ -282,7 +303,7 @@ namespace Tensorflow
                 foreach (var attr_def in op.node_def.Attr)
                     attr_protos[attr_def.Key] = attr_def.Value;
 
-                return op.graph.create_op(new_op_type, new_op_inputs.ToArray(), op._output_types, 
+                return op.graph.create_op(new_op_type, new_op_inputs.ToArray(), op._output_types,
                     name: new_op_name, attrs: attr_protos);
             }
             return op;
@@ -291,15 +312,15 @@ namespace Tensorflow
         private Operation _find_initialized_value_for_variable(Operation variable_op)
         {
             var var_names = new[] { variable_op.node_def.Name, variable_op.node_def.Name + ":0" };
-            foreach(var collection_name in new[]{tf.GraphKeys.GLOBAL_VARIABLES,
+            foreach (var collection_name in new[]{tf.GraphKeys.GLOBAL_VARIABLES,
                             tf.GraphKeys.LOCAL_VARIABLES })
             {
                 foreach (var var in variable_op.graph.get_collection<RefVariable>(collection_name))
-                    if (var_names.Contains(var.name))
+                    if (var_names.Contains(var.Name))
                         return var.initialized_value();
             }
 
-           return null;
+            return null;
         }
 
         /// <summary>
@@ -316,29 +337,29 @@ namespace Tensorflow
         /// A `Tensor` that will hold the new value of this variable after
         /// the assignment has completed.
         /// </returns>
-        public ITensorOrOperation assign(object value, bool use_locking = false, string name = null, bool read_value = true)
+        public Tensor assign<T>(T value, bool use_locking = false, string name = null, bool read_value = true)
         {
             var assign = gen_state_ops.assign(_variable, value, use_locking: use_locking, name: name);
             if (read_value)
                 return assign;
             return assign.op;
         }
-
+        
         public override string ToString()
         {
-            return $"tf.RefVariable '{name}' shape={shape} dtype={dtype}";
+            return $"tf.RefVariable '{Name}' shape={shape} dtype={dtype}";
         }
 
         public VariableDef to_proto(string export_scope)
         {
-            if(string.IsNullOrEmpty(export_scope) || _variable.name.StartsWith(export_scope))
+            if (string.IsNullOrEmpty(export_scope) || _variable.name.StartsWith(export_scope))
             {
                 var var_def = new VariableDef();
                 var_def.VariableName = ops.strip_name_scope(_variable.name, export_scope);
                 if (_initial_value != null)
                     var_def.InitialValueName = ops.strip_name_scope(_initial_value.name, export_scope);
                 var_def.Trainable = _trainable;
-                var_def.InitializerName = ops.strip_name_scope(initializer.name, export_scope);
+                var_def.InitializerName = ops.strip_name_scope(Initializer.name, export_scope);
                 var_def.SnapshotName = ops.strip_name_scope(_snapshot.name, export_scope);
                 if (_save_slice_info)
                     throw new NotImplementedException("to_proto _save_slice_info");
@@ -383,6 +404,45 @@ namespace Tensorflow
             return control_flow_ops.cond(is_variable_initialized(this),
                                    read_value,
                                    initial_value);
+        }
+
+        //  Update 'ref' by adding 'value' to it.
+        //  This operation outputs "ref" after the update is done.
+        //  This makes it easier to chain operations that need to use the reset value.
+        //  Args:
+        //    ref: A mutable `Tensor`. Must be one of the following types: `float32`, `float64`, `int32`, `uint8`, `int16`, `int8`, `complex64`, `int64`, `qint8`, `quint8`, `qint32`, `bfloat16`, `uint16`, `complex128`, `half`, `uint32`, `uint64`.
+        //      Should be from a `Variable` node.
+        //    value: A `Tensor`. Must have the same type as `ref`.
+        //      The value to be added to the variable.
+        //    use_locking: An optional `bool`. Defaults to `False`.
+        //      If True, the addition will be protected by a lock;
+        //        otherwise the behavior is undefined, but may exhibit less contention.
+        //      name: A name for the operation(optional).
+        //  Returns:
+        //    A mutable `Tensor`. Has the same type as `ref`.
+        public Tensor assign_add<T>(T value, bool use_locking = false, string name = null, bool read_value = true)
+        {
+            var variable = this;
+            var _op = tf.OpDefLib._apply_op_helper("AssignAdd", name: name, args: new { variable, value, use_locking });
+            return _op;
+        }
+
+        public NDArray numpy()
+            => throw new RuntimeError("Graph mode can't use numpy().");
+
+        public Tensor assign_sub<T>(T delta, bool use_locking = false, string name = null, bool read_value = true)
+        {
+            throw new NotImplementedException();
+        }
+
+        public IVariableV1 assign_sub_lazy_load(Tensor delta, string name = null)
+        {
+            throw new NotImplementedException();
+        }
+
+        public IVariableV1 assign_lazy_load(Tensor value, string name = null)
+        {
+            throw new NotImplementedException();
         }
     }
 }

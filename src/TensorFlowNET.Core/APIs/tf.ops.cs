@@ -27,20 +27,19 @@ namespace Tensorflow
         public void add_to_collections<T>(List<string> names, T value)
             => get_default_graph().add_to_collections(names, value);
 
-        public Tensor assign(Tensor @ref, object value, bool validate_shape = true, bool use_locking = true, string name = null) 
-            => state_ops.assign(@ref, value, validate_shape, use_locking, name);
-
-        public Tensor assign(RefVariable @ref, object value, bool validate_shape = true, bool use_locking = true, string name = null)
+        public Tensor assign(IVariableV1 @ref, object value, bool validate_shape = true, bool use_locking = true, string name = null)
             => state_ops.assign(@ref, value, validate_shape, use_locking, name);
 
         public void device(string device_name)
             => get_default_graph().device(device_name);
 
-        public List<T> get_collection<T>(string key, string scope = "") 
+        public List<T> get_collection<T>(string key, string scope = "")
             => get_default_graph().get_collection<T>(key, scope: scope);
 
         /// <summary>
         /// A context manager that lifts ops out of control-flow scopes and function-building graphs.
+        /// When eager execution is enabled, code inside an init_scope block runs with
+        /// eager execution enabled even when tracing a `tf.function`. 
         /// </summary>
         public void init_scope()
             => ops.init_scope();
@@ -52,7 +51,7 @@ namespace Tensorflow
         /// <param name="default_name">The default name to use if the name argument is None.</param>
         /// <param name="values">The list of Tensor arguments that are passed to the op function.</param>
         /// <returns>The scope name.</returns>
-        public ops.NameScope name_scope(string name, string default_name = "", object values = null) 
+        public ops.NameScope name_scope(string name, string default_name = "", object values = null)
             => new ops.NameScope(name, default_name, values);
 
         /// <summary>

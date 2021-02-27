@@ -32,7 +32,7 @@ namespace Tensorflow
         /// <param name="session">TF_Session*</param>
         /// <param name="status">TF_Status*</param>
         [DllImport(TensorFlowLibName)]
-        public static extern void TF_DeleteSession(IntPtr session, IntPtr status);
+        public static extern void TF_DeleteSession(IntPtr session, SafeStatusHandle status);
 
         /// <summary>
         /// Destroy an options object.
@@ -50,14 +50,14 @@ namespace Tensorflow
         /// <param name="status">TF_Status*</param>
         /// <returns>TF_Session*</returns>
         [DllImport(TensorFlowLibName)]
-        public static extern IntPtr TF_NewSession(IntPtr graph, IntPtr opts, IntPtr status);
+        public static extern IntPtr TF_NewSession(IntPtr graph, SafeSessionOptionsHandle opts, SafeStatusHandle status);
 
         /// <summary>
         /// Return a new options object.
         /// </summary>
         /// <returns>TF_SessionOptions*</returns>
         [DllImport(TensorFlowLibName)]
-        public static extern unsafe IntPtr TF_NewSessionOptions();
+        public static extern SafeSessionOptionsHandle TF_NewSessionOptions();
 
         /// <summary>
         /// Run the graph associated with the session starting with the supplied inputs
@@ -103,7 +103,7 @@ namespace Tensorflow
                    TF_Output[] outputs, IntPtr[] output_values, int noutputs,
                    IntPtr[] target_opers, int ntargets,
                    IntPtr run_metadata,
-                   IntPtr status);
+                   SafeStatusHandle status);
 
         /// <summary>
         /// Set the config in TF_SessionOptions.options.
@@ -116,9 +116,9 @@ namespace Tensorflow
         /// <param name="proto_len">size_t</param>
         /// <param name="status">TF_Status*</param>
         [DllImport(TensorFlowLibName)]
-        public static extern void TF_SetConfig(IntPtr options, IntPtr proto, ulong proto_len, IntPtr status);
+        public static extern void TF_SetConfig(SafeSessionOptionsHandle options, IntPtr proto, ulong proto_len, SafeStatusHandle status);
 
         [DllImport(TensorFlowLibName)]
-        public static extern void TF_SetTarget(IntPtr options, string target);
+        public static extern void TF_SetTarget(SafeSessionOptionsHandle options, string target);
     }
 }

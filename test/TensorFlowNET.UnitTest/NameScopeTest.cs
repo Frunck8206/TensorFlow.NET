@@ -1,12 +1,12 @@
-﻿using System;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Tensorflow;
+using Tensorflow.UnitTest;
 using static Tensorflow.Binding;
 
-namespace TensorFlowNET.UnitTest
+namespace TensorFlowNET.UnitTest.Basics
 {
     [TestClass]
-    public class NameScopeTest
+    public class NameScopeTest : GraphModeTestBase
     {
         string name = "";
 
@@ -42,6 +42,20 @@ namespace TensorFlowNET.UnitTest
             g.Dispose();
 
             Assert.AreEqual("", g._name_stack);
+        }
+
+        [TestMethod]
+        public void NameScopeInEagerMode()
+        {
+            tf.enable_eager_execution();
+
+            tf_with(new ops.NameScope("scope"), scope =>
+            {
+                string name = scope;
+                var const1 = tf.constant(1.0);
+            });
+
+            tf.compat.v1.disable_eager_execution();
         }
 
         [TestMethod, Ignore("Unimplemented Usage")]

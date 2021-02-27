@@ -14,7 +14,7 @@
    limitations under the License.
 ******************************************************************************/
 
-using System;
+using static Tensorflow.Binding;
 
 namespace Tensorflow.Train
 {
@@ -26,24 +26,30 @@ namespace Tensorflow.Train
         /// Restore-on-create for a variable be saved with this `Checkpointable`.
         /// </summary>
         /// <returns></returns>
-        protected virtual VariableV1 _add_variable_with_custom_getter(string name,
-            int[] shape,
-            TF_DataType dtype = TF_DataType.TF_FLOAT,
-            IInitializer initializer = null,
-            Func<string, int[], TF_DataType, IInitializer, bool, VariableV1> getter = null,
-            bool overwrite = false,
-            bool trainable = false)
+        protected virtual IVariableV1 _add_variable_with_custom_getter(VariableArgs args)
         {
-            var checkpoint_initializer = true;
-            var new_variable = getter(name, shape, dtype, initializer, trainable);
+            tf_with(ops.init_scope(), delegate
+            {
+#pragma warning disable CS0219 // Variable is assigned but its value is never used
+                IInitializer checkpoint_initializer = null;
+#pragma warning restore CS0219 // Variable is assigned but its value is never used
+                if (tf.Context.executing_eagerly())
+#pragma warning disable CS0642 // Possible mistaken empty statement
+                    ;
+#pragma warning restore CS0642 // Possible mistaken empty statement
+                else
+                    checkpoint_initializer = null;
+            });
+
+            var new_variable = args.Getter(args);
 
             // If we set an initializer and the variable processed it, tracking will not
             // assign again. It will add this variable to our dependencies, and if there
             // is a non-trivial restoration queued, it will handle that. This also
             // handles slot variables.
-            if (!overwrite || new_variable is RefVariable)
-                return _track_checkpointable(new_variable, name: name,
-                                        overwrite: overwrite);
+            if (!args.Overwrite || new_variable is RefVariable)
+                return _track_checkpointable(new_variable, name: args.Name,
+                                        overwrite: args.Overwrite);
             else
                 return new_variable;
         }
@@ -53,13 +59,13 @@ namespace Tensorflow.Train
         /// </summary>
         /// <param name="name"></param>
         /// <param name="trackable"></param>
-        protected void _handle_deferred_dependencies(string name, VariableV1 trackable)
+        protected void _handle_deferred_dependencies(string name, IVariableV1 trackable)
         {
             _maybe_initialize_trackable();
             // TODO
         }
 
-        protected VariableV1 _track_checkpointable(VariableV1 checkpointable, string name, bool overwrite = false)
+        protected IVariableV1 _track_checkpointable(IVariableV1 checkpointable, string name, bool overwrite = false)
         {
             return checkpointable;
         }

@@ -23,10 +23,12 @@ namespace Tensorflow
     {
         _DefaultStack _default_session_stack = new _DefaultStack();
 
-        public class _DefaultStack : IObjectLife
+        public class _DefaultStack : ITensorFlowObject
         {
             Stack<object> stack;
+#pragma warning disable CS0414 // The field 'ops._DefaultStack._enforce_nesting' is assigned but its value is never used
             bool _enforce_nesting = true;
+#pragma warning restore CS0414 // The field 'ops._DefaultStack._enforce_nesting' is assigned but its value is never used
 
             public _DefaultStack()
             {
@@ -35,12 +37,12 @@ namespace Tensorflow
 
             public void __enter__()
             {
-                
+
             }
 
             public void __exit__()
             {
-                
+
             }
 
             public void Dispose()
@@ -50,12 +52,12 @@ namespace Tensorflow
 
             public void __init__()
             {
-                
+
             }
 
             public void __del__()
             {
-                
+
             }
         }
     }

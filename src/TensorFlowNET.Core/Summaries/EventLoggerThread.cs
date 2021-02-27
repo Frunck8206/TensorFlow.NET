@@ -27,7 +27,9 @@ namespace Tensorflow.Summaries
     public class EventLoggerThread
     {
         Queue<Event> _queue;
+#pragma warning disable CS0414 // The field 'EventLoggerThread.daemon' is assigned but its value is never used
         bool daemon;
+#pragma warning restore CS0414 // The field 'EventLoggerThread.daemon' is assigned but its value is never used
         EventsWriter _ev_writer;
         int _flush_secs;
         Event _sentinel_event;
@@ -49,7 +51,7 @@ namespace Tensorflow.Summaries
             {
                 while (true)
                 {
-                    if(_queue.Count == 0)
+                    if (_queue.Count == 0)
                     {
                         Thread.Sleep(_flush_secs * 1000);
                         continue;

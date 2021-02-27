@@ -30,11 +30,11 @@ namespace Tensorflow
         /// <param name="seed"></param>
         /// <param name="name"></param>
         /// <returns></returns>
-        public static Tensor random_normal(int[] shape, 
-            float mean = 0.0f, 
-            float stddev = 1.0f, 
-            TF_DataType dtype = TF_DataType.TF_FLOAT, 
-            int? seed = null, 
+        public static Tensor random_normal(TensorShape shape,
+            float mean = 0.0f,
+            float stddev = 1.0f,
+            TF_DataType dtype = TF_DataType.TF_FLOAT,
+            int? seed = null,
             string name = null)
         {
             return tf_with(ops.name_scope(name, "random_normal", new { shape, mean, stddev }), scope =>
@@ -47,6 +47,7 @@ namespace Tensorflow
                 var rnd = gen_random_ops.random_standard_normal(shape_tensor, dtype: dtype, seed: seed1, seed2: seed2);
                 var mul = rnd * stddev_tensor;
                 var value = math_ops.add(mul, mean_tensor, name: name);
+                // tensor_util.maybe_set_static_shape(value, shape)
                 return value;
             });
         }
@@ -61,20 +62,21 @@ namespace Tensorflow
         /// <param name="seed">Used to create a random seed for the distribution.</param>
         /// <param name="name">A name for the operation</param>
         /// <returns>A tensor of the specified shape filled with random uniform values.</returns>
-        public static Tensor random_uniform(int[] shape, 
+        public static Tensor random_uniform(int[] shape,
             float minval = 0,
             float maxval = 1,
-            TF_DataType dtype = TF_DataType.TF_FLOAT, 
-            int? seed = null, 
+            TF_DataType dtype = TF_DataType.TF_FLOAT,
+            int? seed = null,
             string name = null)
         {
             return tf_with(ops.name_scope(name, "random_uniform", new { shape, minval, maxval }), scope =>
             {
                 name = scope;
+                var (seed1, seed2) = random_seed.get_seed(seed);
                 var tensorShape = tensor_util.shape_tensor(shape);
                 var minTensor = ops.convert_to_tensor(minval, dtype: dtype, name: "min");
                 var maxTensor = ops.convert_to_tensor(maxval, dtype: dtype, name: "max");
-                var rnd = gen_random_ops.random_uniform(tensorShape, dtype);
+                var rnd = gen_random_ops.random_uniform(tensorShape, dtype, seed: seed1, seed2: seed2);
                 return math_ops.add(rnd * (maxTensor - minTensor), minTensor, name: name);
             });
         }
@@ -114,7 +116,7 @@ namespace Tensorflow
         public static Tensor random_shuffle(Tensor value, int? seed = null, string name = null)
         {
             var (seed1, seed2) = random_seed.get_seed(seed);
-            return gen_random_ops.random_shuffle(value, seed: seed1.Value, seed2: seed2.Value, name: name);
+            return gen_random_ops.random_shuffle(value, seed: seed1 ?? 0, seed2: seed2 ?? 0, name: name);
         }
 
         public static Tensor truncated_normal(int[] shape,
@@ -157,7 +159,7 @@ namespace Tensorflow
         /// </summary>
         /// <param name="logits"></param>
         /// <param name="num_samples"></param>
-        /// <param name="output_dtype"></param>
+        /// <param name="dtype"></param>
         /// <param name="seed"></param>
         /// <returns></returns>
         private static Tensor multinomial_categorical_impl(Tensor logits, int num_samples, TF_DataType dtype = TF_DataType.DtInvalid,
@@ -165,10 +167,10 @@ namespace Tensorflow
         {
             logits = ops.convert_to_tensor(logits, name: "logits");
             var (seed1, seed2) = random_seed.get_seed(seed);
-            return gen_random_ops.multinomial(logits, 
-                num_samples, 
-                seed: seed1, 
-                seed2: seed2, 
+            return gen_random_ops.multinomial(logits,
+                num_samples,
+                seed: seed1,
+                seed2: seed2,
                 output_dtype: dtype);
         }
     }

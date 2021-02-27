@@ -14,10 +14,9 @@
    limitations under the License.
 ******************************************************************************/
 
+using NumSharp;
 using System;
 using System.Numerics;
-using NumSharp;
-using NumSharp.Backends;
 
 namespace Tensorflow
 {
@@ -46,7 +45,7 @@ namespace Tensorflow
         /// <returns><see cref="System.Type"/> equivalent to <paramref name="type"/>, if none exists, returns null.</returns>
         public static Type as_numpy_dtype(this TF_DataType type)
         {
-            switch (type)
+            switch (type.as_base_dtype())
             {
                 case TF_DataType.TF_BOOL:
                     return typeof(bool);
@@ -72,7 +71,7 @@ namespace Tensorflow
                     return typeof(double);
                 case TF_DataType.TF_STRING:
                     return typeof(string);
-                case TF_DataType.TF_COMPLEX128: 
+                case TF_DataType.TF_COMPLEX128:
                 case TF_DataType.TF_COMPLEX64: //64 is also TF_COMPLEX
                     return typeof(Complex);
                 default:
@@ -112,7 +111,7 @@ namespace Tensorflow
                     return NPTypeCode.Double;
                 case TF_DataType.TF_STRING:
                     return NPTypeCode.String;
-                case TF_DataType.TF_COMPLEX128: 
+                case TF_DataType.TF_COMPLEX128:
                 case TF_DataType.TF_COMPLEX64: //64 is also TF_COMPLEX
                     return NPTypeCode.Complex;
                 default:
@@ -132,7 +131,7 @@ namespace Tensorflow
             switch (type.Name)
             {
                 case "Char":
-                    dtype =  dtype ?? TF_DataType.TF_UINT8;
+                    dtype = dtype ?? TF_DataType.TF_UINT8;
                     break;
                 case "SByte":
                     dtype = TF_DataType.TF_INT8;
@@ -182,20 +181,32 @@ namespace Tensorflow
 
         public static DataType as_datatype_enum(this TF_DataType type)
         {
-            return Enum.TryParse(((int) type).ToString(), out DataType dtype) ? dtype : DataType.DtInvalid;
+            return (DataType)type;
         }
 
         public static TF_DataType as_base_dtype(this TF_DataType type)
         {
-            return (int)type > 100 ?
-                (TF_DataType)Enum.Parse(typeof(TF_DataType), ((int)type - 100).ToString()) :
-                type;
+            return (int)type > 100 ? (TF_DataType)((int)type - 100) : type;
         }
 
         public static int name(this TF_DataType type)
         {
             return (int)type;
         }
+
+        public static string as_numpy_name(this TF_DataType type)
+            => type switch
+            {
+                TF_DataType.TF_STRING => "string",
+                TF_DataType.TF_UINT8 => "uint8",
+                TF_DataType.TF_INT32 => "int32",
+                TF_DataType.TF_INT64 => "int64",
+                TF_DataType.TF_FLOAT => "float32",
+                TF_DataType.TF_BOOL => "bool",
+                TF_DataType.TF_RESOURCE => "resource",
+                TF_DataType.TF_VARIANT => "variant",
+                _ => type.ToString()
+            };
 
         public static Type as_numpy_dtype(this DataType type)
         {
@@ -204,21 +215,22 @@ namespace Tensorflow
 
         public static DataType as_base_dtype(this DataType type)
         {
-            return (int)type > 100 ?
-                (DataType)Enum.Parse(typeof(DataType), ((int)type - 100).ToString()) :
-                type;
+            return (int)type > 100 ? (DataType)((int)type - 100) : type;
         }
 
         public static TF_DataType as_tf_dtype(this DataType type)
         {
-            return Enum.TryParse(((int) type).ToString(), out TF_DataType dtype) ? dtype : TF_DataType.DtInvalid;
+            return (TF_DataType)type;
         }
 
         public static TF_DataType as_ref(this TF_DataType type)
         {
-            return (int)type < 100 ?
-                (TF_DataType)Enum.Parse(typeof(TF_DataType), ((int)type + 100).ToString()) :
-                type;
+            return (int)type < 100 ? (TF_DataType)((int)type + 100) : type;
+        }
+
+        public static long min(this TF_DataType type)
+        {
+            throw new NotImplementedException($"min {type.name()}");
         }
 
         public static long max(this TF_DataType type)
@@ -269,6 +281,24 @@ namespace Tensorflow
         public static bool is_compatible_with(this TF_DataType self, TF_DataType other)
         {
             return self.as_datatype_enum() == other.as_datatype_enum();
+        }
+
+        public static TF_DataType real_dtype(this TF_DataType self)
+        {
+            TF_DataType base_ = self.as_base_dtype();
+            if (base_ == complex64)
+                return float32;
+            else if (base_ == complex128)
+                return float64;
+            else
+                return self;
+        }
+
+        public static bool is_value_dtype(this TF_DataType type)
+        {
+            return ((int)type >= 1 && (int)type <= 19)
+                || type == TF_DataType.TF_UINT32
+                || type == TF_DataType.TF_UINT64;
         }
     }
 }

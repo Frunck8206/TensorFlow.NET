@@ -14,15 +14,21 @@
    limitations under the License.
 ******************************************************************************/
 
-using System.Threading;
+using System.Collections.Generic;
+using Serilog;
+using Serilog.Core;
+using Tensorflow.Contexts;
 using Tensorflow.Eager;
+using Tensorflow.Gradients;
 
 namespace Tensorflow
 {
-    public partial class tensorflow : IObjectLife
+    public delegate Tensor[] BackwardFunction(Tensor[] grads, long[] unneeded_gradients);
+
+    public partial class tensorflow : ITensorFlowObject
     {
-        public TF_DataType @byte = TF_DataType.TF_UINT8;
-        public TF_DataType @sbyte = TF_DataType.TF_INT8;
+        public TF_DataType byte8 = TF_DataType.TF_UINT8;
+        public TF_DataType int8 = TF_DataType.TF_INT8;
         public TF_DataType int16 = TF_DataType.TF_INT16;
         public TF_DataType int32 = TF_DataType.TF_INT32;
         public TF_DataType int64 = TF_DataType.TF_INT64;
@@ -33,63 +39,58 @@ namespace Tensorflow
         public TF_DataType chars = TF_DataType.TF_STRING;
         public TF_DataType @string = TF_DataType.TF_STRING;
 
-        public Context context = new Context(new ContextOptions(), new Status());
-
+        public Status Status;
+        public OpDefLibrary OpDefLib;
+        public Context Context;
+        public IEagerRunner Runner;
+        public Logger Logger;
 
         public tensorflow()
         {
-            _constructThreadingObjects();
-        }
+            Logger = new LoggerConfiguration()
+                .MinimumLevel.Error()
+                .WriteTo.Console()
+                .CreateLogger();
 
-
-
-        public RefVariable Variable<T>(T data,
-            bool trainable = true,
-            bool validate_shape = true,
-            string name = null,
-            TF_DataType dtype = TF_DataType.DtInvalid)
-        {
-            return Tensorflow.variable_scope.default_variable_creator(data,
-                trainable: trainable,
-                validate_shape: validate_shape,
-                name: name,
-                dtype: dtype) as RefVariable;
-        }
-
-        public VariableV1 VariableV1<T>(T data,
-            bool trainable = true,
-            bool validate_shape = true,
-            string name = null,
-            TF_DataType dtype = TF_DataType.DtInvalid,
-            bool use_resource = false,
-            int[] shape = null)
-        {
-            return Tensorflow.variable_scope.default_variable_creator(data,
-                trainable: trainable,
-                validate_shape: validate_shape,
-                name: name,
-                dtype: dtype,
-                use_resource: use_resource,
-                shape: shape);
-        }
-
-        public unsafe Tensor placeholder(TF_DataType dtype, TensorShape shape = null, string name = null)
-        {
-            return gen_array_ops.placeholder(dtype, shape, name);
-        }
-
-        public void enable_eager_execution()
-        {
-            // contex = new Context();
-            context.default_execution_mode = Context.EAGER_MODE;
+            Status = new Status();
+            Context = new Context();
+            OpDefLib = new OpDefLibrary();
+            ConstructThreadingObjects();
+            InitGradientEnvironment();
+            Runner = new EagerRunner();
         }
 
         public string VERSION => c_api.StringPiece(c_api.TF_Version());
 
-        public Session get_default_session()
+        private void InitGradientEnvironment()
         {
-            return ops.get_default_session();
+            ops.RegisterFromAssembly();
         }
+
+        public ResourceVariable Variable<T>(T data,
+            bool trainable = true,
+            bool validate_shape = true,
+            bool use_resource = true,
+            string name = null,
+            TF_DataType dtype = TF_DataType.DtInvalid,
+            VariableAggregation aggregation = VariableAggregation.None,
+            int[] shape = null)
+            => new ResourceVariable(data,
+                    trainable: trainable,
+                    validate_shape: validate_shape,
+                    name: name,
+                    dtype: dtype,
+                    aggregation: aggregation,
+                    shape: shape);
+
+        public Tensor placeholder(TF_DataType dtype, TensorShape shape = null, string name = null)
+            => array_ops.placeholder(dtype, shape, name);
+
+        public void enable_eager_execution()
+            => Context.eager_mode();
+
+        public Session get_default_session()
+            => ops.get_default_session();
 
         public Session Session()
         {
@@ -106,29 +107,40 @@ namespace Tensorflow
             return new Session(null, config).as_default();
         }
 
+        List<ITape> tape_set;
+        public List<ITape> GetTapeSet()
+        {
+            if (tape_set == null)
+            {
+                tape_set = new List<ITape>();
+            }
+
+            return tape_set;
+        }
+
         public void __init__()
         {
-            
+
         }
 
         public void __enter__()
         {
-            
+
         }
 
         public void __exit__()
         {
-            
+
         }
 
         public void __del__()
         {
-            
+
         }
 
         public void Dispose()
         {
-            
+
         }
     }
 }

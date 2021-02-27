@@ -1,19 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using FluentAssertions;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NumSharp;
+using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using FluentAssertions;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NumSharp;
 using Tensorflow;
-using Tensorflow.Util;
+using Tensorflow.UnitTest;
 using static Tensorflow.Binding;
 
 namespace TensorFlowNET.UnitTest
 {
     [TestClass]
-    public class MultithreadingTests
+    public class MultithreadingTests : GraphModeTestBase
     {
         [TestMethod]
         public void SessionCreation()
@@ -74,6 +73,7 @@ namespace TensorFlowNET.UnitTest
                 tf.peak_default_graph().Should().BeNull();
                 var beforehand = tf.get_default_graph(); //this should create default automatically.
                 beforehand.graph_key.Should().NotContain("-0/", "Already created a graph in an other thread.");
+                beforehand.as_default();
                 tf.peak_default_graph().Should().NotBeNull();
 
                 using (var sess = tf.Session())
@@ -145,10 +145,9 @@ namespace TensorFlowNET.UnitTest
                 //tf.Session created an other graph
                 using (var sess = tf.Session())
                 {
-                    Tensor t = null;
                     for (int i = 0; i < 100; i++)
                     {
-                        t = new Tensor(new int[] {1, 2, 3});
+                        var t = new Tensor(new int[] { 1, 2, 3 });
                     }
                 }
             }
@@ -167,13 +166,12 @@ namespace TensorFlowNET.UnitTest
             {
                 using (var sess = tf.Session())
                 {
-                    Tensor t = null;
                     for (int i = 0; i < 100; i++)
                     {
-                        var v = (int*) Marshal.AllocHGlobal(sizeof(int));
+                        var v = (int*)Marshal.AllocHGlobal(sizeof(int));
                         c_api.DeallocatorArgs _deallocatorArgs = new c_api.DeallocatorArgs();
                         var handle = c_api.TF_NewTensor(typeof(int).as_dtype(), dims: new long[0], num_dims: 0,
-                            data: (IntPtr) v, len: (UIntPtr) sizeof(int),
+                            data: (IntPtr)v, len: (UIntPtr)sizeof(int),
                             deallocator: (IntPtr data, IntPtr size, ref c_api.DeallocatorArgs args) => Marshal.FreeHGlobal(data),
                             ref _deallocatorArgs);
                         c_api.TF_DeleteTensor(handle);
@@ -192,8 +190,8 @@ namespace TensorFlowNET.UnitTest
             {
                 tf.peak_default_graph().Should().BeNull();
                 //graph is created automatically to perform create these operations
-                var a1 = tf.constant(new[] {2f}, shape: new[] {1});
-                var a2 = tf.constant(new[] {3f}, shape: new[] {1});
+                var a1 = tf.constant(new[] { 2f }, shape: new[] { 1 });
+                var a2 = tf.constant(new[] { 3f }, shape: new[] { 1 });
                 var math = a1 + a2;
                 for (int i = 0; i < 100; i++)
                 {
@@ -217,8 +215,8 @@ namespace TensorFlowNET.UnitTest
                 {
                     tf.peak_default_graph().Should().NotBeNull();
                     //graph is created automatically to perform create these operations
-                    var a1 = tf.constant(new[] {2f}, shape: new[] {1});
-                    var a2 = tf.constant(new[] {3f}, shape: new[] {1});
+                    var a1 = tf.constant(new[] { 2f }, shape: new[] { 1 });
+                    var a2 = tf.constant(new[] { 3f }, shape: new[] { 1 });
                     var math = a1 + a2;
 
                     var result = sess.run(math);
@@ -239,8 +237,8 @@ namespace TensorFlowNET.UnitTest
                 {
                     tf.peak_default_graph().Should().NotBeNull();
                     //graph is created automatically to perform create these operations
-                    var a1 = tf.constant(new[] {2f}, shape: new[] {1});
-                    var a2 = tf.constant(new[] {3f}, shape: new[] {1});
+                    var a1 = tf.constant(new[] { 2f }, shape: new[] { 1 });
+                    var a2 = tf.constant(new[] { 3f }, shape: new[] { 1 });
                     var math = a1 + a2;
                 }
             }
@@ -256,12 +254,11 @@ namespace TensorFlowNET.UnitTest
             {
                 tf.peak_default_graph().Should().BeNull();
                 //graph is created automatically to perform create these operations
-                var a1 = tf.constant(new[] {2f}, shape: new[] {1});
-                var a2 = tf.constant(new[] {3f}, shape: new[] {1});
+                var a1 = tf.constant(new[] { 2f }, shape: new[] { 1 });
+                var a2 = tf.constant(new[] { 3f }, shape: new[] { 1 });
                 var math = a1 + a2;
             }
         }
-
 
         [TestMethod]
         public void TF_GraphOperationByName()
@@ -273,8 +270,8 @@ namespace TensorFlowNET.UnitTest
             {
                 tf.peak_default_graph().Should().BeNull();
                 //graph is created automatically to perform create these operations
-                var a1 = tf.constant(new[] {2f}, shape: new[] {1});
-                var a2 = tf.constant(new[] {3f}, shape: new[] {1}, name: "ConstantK");
+                var a1 = tf.constant(new[] { 2f }, shape: new[] { 1 });
+                var a2 = tf.constant(new[] { 3f }, shape: new[] { 1 }, name: "ConstantK");
                 var math = a1 + a2;
                 for (int i = 0; i < 100; i++)
                 {
@@ -285,6 +282,7 @@ namespace TensorFlowNET.UnitTest
 
         private static readonly string modelPath = Path.GetFullPath("./Utilities/models/example1/");
 
+        [Ignore]
         [TestMethod]
         public void TF_GraphOperationByName_FromModel()
         {
@@ -297,28 +295,20 @@ namespace TensorFlowNET.UnitTest
                 for (int j = 0; j < 100; j++)
                 {
                     var sess = Session.LoadFromSavedModel(modelPath).as_default();
-                    var inputs = new[] {"sp", "fuel"};
+                    var inputs = new[] { "sp", "fuel" };
 
                     var inp = inputs.Select(name => sess.graph.OperationByName(name).output).ToArray();
                     var outp = sess.graph.OperationByName("softmax_tensor").output;
 
-                    for (var i = 0; i < 100; i++)
+                    for (var i = 0; i < 8; i++)
                     {
-                        {
-                            var data = new float[96];
-                            FeedItem[] feeds = new FeedItem[2];
+                        var data = new float[96];
+                        FeedItem[] feeds = new FeedItem[2];
 
-                            for (int f = 0; f < 2; f++)
-                                feeds[f] = new FeedItem(inp[f], new NDArray(data));
+                        for (int f = 0; f < 2; f++)
+                            feeds[f] = new FeedItem(inp[f], new NDArray(data));
 
-                            try
-                            {
-                                sess.run(outp, feeds);
-                            } catch (Exception ex)
-                            {
-                                Console.WriteLine(ex);
-                            }
-                        }
+                        sess.run(outp, feeds);
                     }
                 }
             }

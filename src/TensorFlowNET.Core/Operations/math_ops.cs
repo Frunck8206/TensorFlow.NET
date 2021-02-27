@@ -17,6 +17,7 @@
 using NumSharp;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Tensorflow.Framework;
 using static Tensorflow.Binding;
 
@@ -35,13 +36,19 @@ namespace Tensorflow
                 x = ops.convert_to_tensor(x, name: "x");
                 if (x.dtype.is_complex())
                     throw new NotImplementedException("math_ops.abs for dtype.is_complex");
-                    //return gen_math_ops.complex_abs(x, Tout: x.dtype.real_dtype, name: name);
+                //return gen_math_ops.complex_abs(x, Tout: x.dtype.real_dtype, name: name);
                 return gen_math_ops._abs(x, name: name);
             });
         }
 
-        public static Tensor add<Tx, Ty>(Tx x, Ty y, string name = null) 
+        public static Tensor add<Tx, Ty>(Tx x, Ty y, string name = null)
             => gen_math_ops.add(x, y, name);
+
+        public static Tensor add_v2(Tensor x, Tensor y, string name = null)
+            => tf.Context.ExecuteOp("AddV2", name, new ExecuteOpArgs(x, y));
+
+        public static Tensor add_v2<Tx, Ty>(Tx x, Ty y, string name = null)
+            => gen_math_ops.add_v2(x, y, name);
 
         /// <summary>
         /// Adds all input tensors element-wise.
@@ -53,21 +60,67 @@ namespace Tensorflow
         {
             inputs = ops.convert_n_to_tensor_or_indexed_slices(inputs);
 
-            if(inputs.Length == 1)
+            if (inputs.Length == 1)
             {
                 var values = inputs[0];
                 if (name != null)
                     return array_ops.identity(values, name: name);
                 return values;
             }
-            
+
             return gen_math_ops.add_n(inputs, name: name);
+        }
+
+        public static Tensor argmax(Tensor input, int dimension, TF_DataType output_type = TF_DataType.TF_INT64, string name = null)
+            => gen_math_ops.arg_max(input, dimension, output_type: output_type, name: name);
+
+        public static Tensor round(Tensor x, string name = null)
+        {
+            x = ops.convert_to_tensor(x, name: "x");
+            if (x.dtype.is_integer())
+                return x;
+            else
+                return gen_math_ops.round(x, name: name);
+        }
+
+        public static Tensor cast(IVariableV1 x, TF_DataType dtype = TF_DataType.DtInvalid, string name = null)
+        {
+            var base_type = dtype.as_base_dtype();
+            if (base_type == x.dtype)
+                return x.AsTensor();
+
+            return tf_with(ops.name_scope(name, "Cast", new { x }), scope =>
+            {
+                name = scope;
+                var t_x = ops.convert_to_tensor(x, name: "x");
+                if (t_x.dtype.as_base_dtype() != base_type)
+                    t_x = gen_math_ops.cast(t_x, base_type, name: name);
+
+                return x.AsTensor();
+            });
+        }
+
+        public static ResourceVariable cast(ResourceVariable x, TF_DataType dtype = TF_DataType.DtInvalid, string name = null)
+        {
+            var base_type = dtype.as_base_dtype();
+            if (base_type == x.dtype)
+                return x;
+
+            return tf_with(ops.name_scope(name, "Cast", new { x }), scope =>
+            {
+                name = scope;
+                var t_x = ops.convert_to_tensor(x, name: "x");
+                if (t_x.dtype.as_base_dtype() != base_type)
+                    t_x = gen_math_ops.cast(t_x, base_type, name: name);
+
+                return x;
+            });
         }
 
         public static Tensor cast(Tensor x, TF_DataType dtype = TF_DataType.DtInvalid, string name = null)
         {
             var base_type = dtype.as_base_dtype();
-            if(base_type == x.dtype)
+            if (base_type == x.dtype)
                 return x;
 
             return tf_with(ops.name_scope(name, "Cast", new { x }), scope =>
@@ -79,6 +132,24 @@ namespace Tensorflow
 
                 return x;
             });
+        }
+
+        public static Tensor saturate_cast(Tensor value, TF_DataType dtype, string name = null)
+        {
+            return tf_with(ops.name_scope(name, "saturate_cast", new[] { value }), name =>
+             {
+                 value = ops.convert_to_tensor(value, name: "value");
+                 // dtype = dtypes.as_dtype(dtype).as_base_dtype();
+                 if (value.dtype.min() < dtype.min())
+                     value = gen_math_ops.maximum(
+                         value,
+                         ops.convert_to_tensor(dtype.min(), dtype: value.dtype, name: "min"));
+                 if (value.dtype.max() > dtype.max())
+                     value = gen_math_ops.minimum(
+                         value,
+                         ops.convert_to_tensor(dtype.max(), dtype: value.dtype, name: "max"));
+                 return cast(value, dtype, name: name);
+             });
         }
 
         public static Tensor cast(float x, TF_DataType dtype = TF_DataType.DtInvalid, string name = null)
@@ -97,15 +168,12 @@ namespace Tensorflow
         }
 
         public static Tensor cumsum<T>(Tensor x, T axis = default, bool exclusive = false, bool reverse = false, string name = null)
-        {
-            return tf_with(ops.name_scope(name, "Cumsum", new {x}), scope =>
+            => tf_with(ops.name_scope(name, "Cumsum", new { x }), scope =>
             {
                 name = scope;
-                x = ops.convert_to_tensor(x, name: "x");
-
-                return gen_math_ops.cumsum(x, axis: axis, exclusive: exclusive, reverse: reverse, name: name);
+                return tf.Context.ExecuteOp("Cumsum", name, new ExecuteOpArgs(x, axis)
+                    .SetAttributes(new { exclusive, reverse }));
             });
-        }
 
         /// <summary>
         /// Computes Psi, the derivative of Lgamma (the log of the absolute value of
@@ -180,8 +248,20 @@ namespace Tensorflow
         public static Tensor equal<Tx, Ty>(Tx x, Ty y, string name = null)
             => gen_math_ops.equal(x, y, name: name);
 
+        /// <summary>
+        /// Computes the Gauss error function of `x` element-wise.
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public static Tensor erf(Tensor x, string name = null)
+            => tf.Context.ExecuteOp("Erf", name, new ExecuteOpArgs(x));
+
         public static Tensor sqrt(Tensor x, string name = null)
             => gen_math_ops.sqrt(x, name: name);
+
+        public static Tensor multiply(Tensor x, Tensor y, string name = null)
+            => tf.Context.ExecuteOp("Mul", name, new ExecuteOpArgs(x, y));
 
         public static Tensor multiply<Tx, Ty>(Tx x, Ty y, string name = null)
             => gen_math_ops.mul(x, y, name: name);
@@ -191,6 +271,24 @@ namespace Tensorflow
 
         public static Tensor mul_no_nan<Tx, Ty>(Tx x, Ty y, string name = null)
             => gen_math_ops.mul_no_nan(x, y, name: name);
+
+        public static Tensor real(Tensor input, string name = null)
+        {
+            return tf_with(ops.name_scope(name, "Real", new[] { input }), scope =>
+             {
+                 // name = scope;
+                 input = ops.convert_to_tensor(input, name: "input");
+                 if (input.dtype.is_complex())
+                 {
+                     var real_dtype = input.dtype.real_dtype();
+                     return real(input, name: scope);
+                 }
+                 else
+                 {
+                     return input;
+                 }
+             });
+        }
 
         /// <summary>
         /// Computes the mean of elements across dimensions of a tensor.
@@ -207,31 +305,17 @@ namespace Tensorflow
         public static Tensor reduce_mean(Tensor input_tensor, int[] axis = null, bool keepdims = false, string name = null, int? reduction_indices = null)
         {
             var r = _ReductionDims(input_tensor, axis);
-            if (axis == null)
-            {
-                var m = gen_math_ops.mean(input_tensor, r, keepdims, name);
-                return _may_reduce_to_scalar(keepdims, axis, m);
-            }
-            else
-            {
-                var m = gen_math_ops.mean(input_tensor, axis, keepdims, name);
-                return _may_reduce_to_scalar(keepdims, axis, m);
-            }
+            var axis_tensor = axis == null ? r : ops.convert_to_tensor(axis);
+            var m = gen_math_ops.mean(input_tensor, axis_tensor, keepdims, name);
+            return _may_reduce_to_scalar(keepdims, axis_tensor, m);
         }
 
         public static Tensor reduce_mean(Tensor[] input_tensors, int? axis = null, bool keepdims = false, string name = null)
         {
-            if(axis == null)
-            {
-                var r = _ReductionDims(input_tensors, axis);
-                var m = gen_math_ops.mean(input_tensors, r, keepdims, name);
-                return _may_reduce_to_scalar(keepdims, axis, m);
-            }
-            else
-            {
-                var m = gen_math_ops.mean(input_tensors, axis, keepdims, name);
-                return _may_reduce_to_scalar(keepdims, axis, m);
-            }
+            var r = _ReductionDims(input_tensors, axis);
+            var axis_tensor = axis == null ? r : ops.convert_to_tensor(axis.Value);
+            var m = gen_math_ops.mean(input_tensors, axis_tensor, keepdims, name);
+            return _may_reduce_to_scalar(keepdims, axis, m);
         }
 
         /// <summary>
@@ -257,20 +341,57 @@ namespace Tensorflow
             }
         }
 
-        public static Tensor sigmoid<T>(T x, string name = null)
+        public static Tensor reduce_std(Tensor input_tensor, int[] axis = null, bool keepdims = false, string name = null)
         {
-            var x_tensor = ops.convert_to_tensor(x, name: "x");
-            return gen_math_ops.sigmoid(x_tensor, name: name);
+            if (name == null)
+                name = "reduce_std";
+            // else {name = name;}
+
+            return tf_with(ops.name_scope(name, "reduce_std", new[] { input_tensor }), scope =>
+             {
+                 var variance = reduce_variance(input_tensor, axis: axis, keepdims: keepdims);
+                 return gen_math_ops.sqrt(variance);
+             });
         }
 
-        public static Tensor sign(Tensor x, string name = null)
+        public static Tensor reduce_variance(Tensor input_tensor, int[] axis = null, bool keepdims = false, string name = null)
         {
-            return tf_with(ops.name_scope(name, "Sign", new {x}), scope =>
-            {
-                x = ops.convert_to_tensor(x, name: "x");
-                return gen_math_ops.sign(x);
-            });
+            if (name == null)
+                name = "reduce_variance";
+            // else {name = name;}
+
+            return tf_with(ops.name_scope(name, "reduce_variance", new[] { input_tensor }), scope =>
+             {
+                 var means = reduce_mean(input_tensor, axis: axis, keepdims: true);
+                 if (means.dtype.is_integer())
+                     throw new TypeError("Input must be either real or complex");
+                 var diff = input_tensor - means;
+
+                 Tensor squared_deviations;
+                 if (diff.dtype.is_complex())
+                 {
+                     var real_dtype = diff.dtype.real_dtype();
+                     squared_deviations = real(
+                         gen_math_ops.mul(conj(diff), diff));
+                 }
+                 else
+                 {
+                     squared_deviations = gen_math_ops.square(diff);
+                 }
+                 return reduce_mean(squared_deviations, axis: axis, keepdims: keepdims);
+             });
         }
+
+        public static Tensor sigmoid<T>(T x, string name = null)
+            => tf_with(ops.name_scope(name, "Sigmoid", x), scope =>
+            {
+                name = scope;
+                var x_tensor = ops.convert_to_tensor(x, name: "x");
+                return gen_math_ops.sigmoid(x_tensor, name: name);
+            });
+
+        public static Tensor sign<T>(T x, string name = null)
+            => gen_math_ops.sign(x, name: name);
 
         /// <summary>
         /// Returns (x - y)(x - y) element-wise.
@@ -314,6 +435,14 @@ namespace Tensorflow
         /// <returns>A 1-D Tensor, the output shape as if keepdims were set to True.</returns>
         public static Tensor reduced_shape(Tensor input_shape, Tensor axes)
         {
+            if (tf.Context.executing_eagerly())
+            {
+                var input_shape_val = input_shape.numpy();
+                foreach (var axes_val in axes.numpy().ToArray<int>())
+                    input_shape_val[axes_val] = 1;
+                return tf.constant(input_shape_val);
+            }
+
             input_shape = to_int32(input_shape);
             axes = to_int32(axes);
 
@@ -355,16 +484,19 @@ namespace Tensorflow
             return _may_reduce_to_scalar(keepdims, axis, all);
         }
 
+        public static Tensor realdiv(Tensor x, Tensor y, string name = null)
+            => gen_math_ops.real_div(x, y, name: name);
+
         /// <summary>
         /// Computes log(sum(exp(elements across dimensions of a tensor))).
         /// Reduces `input_tensor` along the dimensions given in `axis`.
         /// Unless `keepdims` is true, the rank of the tensor is reduced by 1 for each
         /// entry in `axis`. If `keepdims` is true, the reduced dimensions
         /// are retained with length 1.
-
+        ///
         /// If `axis` has no entries, all dimensions are reduced, and a
         /// tensor with a single element is returned.
-
+        ///
         /// This function is more numerically stable than log(sum(exp(input))). It avoids
         /// overflows caused by taking the exp of large inputs and underflows caused by
         /// taking the log of small inputs.
@@ -434,7 +566,7 @@ namespace Tensorflow
         /// <returns></returns>
         public static Tensor unsorted_segment_sum(Tensor data, Tensor segment_ids, Tensor num_segments, string name = null)
             => gen_math_ops.unsorted_segment_sum(data, segment_ids, num_segments, name: name);
-        
+
         /// <summary>
         /// Casts a tensor to type `int32`.
         /// </summary>
@@ -463,6 +595,13 @@ namespace Tensorflow
             throw new NotImplementedException();
         }
 
+        public static Tensor reduce_sum(Tensor[] input_tensors, int? axis = null, bool keepdims = false, string name = null)
+        {
+            var dims = _ReductionDims(input_tensors, axis);
+            var m = gen_math_ops._sum(input_tensors, dims, keep_dims: keepdims, name: name);
+            return _may_reduce_to_scalar(keepdims, axis, m);
+        }
+
         public static Tensor reduce_sum(Tensor input_tensor, Tensor axis = null, bool keepdims = false, string name = null)
         {
             var r = _ReductionDims(input_tensor, axis);
@@ -478,7 +617,8 @@ namespace Tensorflow
 
         public static Tensor reduce_sum(Tensor input_tensor, int axis, bool keepdims = false, string name = null)
         {
-            var m = gen_math_ops._sum(input_tensor, axis, keep_dims: keepdims, name: name);
+            var dims = _ReductionDims(input_tensor, axis);
+            var m = gen_math_ops._sum(input_tensor, dims, keep_dims: keepdims, name: name);
             return _may_reduce_to_scalar(keepdims, axis, m);
         }
 
@@ -514,6 +654,9 @@ namespace Tensorflow
             }
             else
             {
+                if (x.rank > -1 && tf.executing_eagerly())
+                    return constant_op.constant(np.arange(x.rank));
+
                 var rank = array_ops.rank(x);
                 return range(0, rank, 1);
             }
@@ -545,7 +688,7 @@ namespace Tensorflow
 
                 if (rank.HasValue && rank.Value > -1)
                 {
-                   return constant_op.constant(np.arange(rank.Value), TF_DataType.TF_INT32);
+                    return constant_op.constant(np.arange(rank.Value), TF_DataType.TF_INT32);
                 }
 
                 return range(0, rank, 1);
@@ -561,9 +704,19 @@ namespace Tensorflow
         public static Tensor rsqrt(Tensor x, string name = null)
             => gen_math_ops.rsqrt(x, name: name);
 
+        public static Tensor pow<Tx, Ty>(Tx x, Ty y, string name = null)
+            => tf_with(ops.name_scope(name, "Pow", new { x, y }), scope =>
+            {
+                name = scope;
+                var x_tensor = ops.convert_to_tensor(x, name: "x");
+                var y_tensor = ops.convert_to_tensor(y, name: "y", dtype: x_tensor.dtype.as_base_dtype());
+
+                return tf.Context.ExecuteOp("Pow", name, new ExecuteOpArgs(x_tensor, y_tensor));
+            });
+
         public static Tensor range(object start, object limit = null, object delta = null, TF_DataType dtype = TF_DataType.DtInvalid, string name = "range")
         {
-            if(limit == null)
+            if (limit == null)
             {
                 limit = start;
                 start = 0;
@@ -575,9 +728,9 @@ namespace Tensorflow
             return tf_with(ops.name_scope(name, "Range", new { start, limit, delta }), scope =>
             {
                 name = scope;
-                var start1 = ops.convert_to_tensor(start, name: "start");
-                var limit1 = ops.convert_to_tensor(limit, name: "limit");
-                var delta1 = ops.convert_to_tensor(delta, name: "delta");
+                var start1 = ops.convert_to_tensor(start, name: "start", dtype: dtype);
+                var limit1 = ops.convert_to_tensor(limit, name: "limit", dtype: dtype);
+                var delta1 = ops.convert_to_tensor(delta, name: "delta", dtype: dtype);
 
                 return gen_math_ops.range(start1, limit1, delta1, name);
             });
@@ -631,9 +784,6 @@ namespace Tensorflow
                 if (transpose_b && adjoint_b)
                     throw new ValueError("Only one of transpose_b and adjoint_b can be True.");
 
-                a = ops.convert_to_tensor(a, name: "a");
-                b = ops.convert_to_tensor(b, name: "b");
-
                 result = gen_math_ops.mat_mul(a, b, transpose_a, transpose_b, name);
             });
 
@@ -643,21 +793,41 @@ namespace Tensorflow
         public static Tensor batch_matmul(Tensor x, Tensor y,
             bool adj_x = false, bool adj_y = false,
             string name = null)
-        {
-            Tensor result = null;
-
-            tf_with(ops.name_scope(name, "MatMul", new Tensor[] { x, y }), scope =>
+            => tf_with(ops.name_scope(name, "MatMul", new Tensor[] { x, y }), scope =>
             {
                 name = scope;
 
                 x = ops.convert_to_tensor(x, name: "a");
                 y = ops.convert_to_tensor(y, name: "b");
 
-                result = gen_math_ops.batch_mat_mul(x, y, adj_x, adj_y, name);
+                return tf.Context.ExecuteOp("BatchMatMul", name, new ExecuteOpArgs(x, y)
+                    .SetAttributes(new { adj_x, adj_y }));
             });
 
-            return result;
-        }
+        public static Tensor bincount(Tensor arr, Tensor weights = null,
+             Tensor minlength = null,
+             Tensor maxlength = null,
+             TF_DataType dtype = TF_DataType.TF_INT32,
+             string name = null,
+             TensorShape axis = null,
+             bool binary_output = false)
+            => tf_with(ops.name_scope(name, "bincount"), scope =>
+            {
+                name = scope;
+                if(!binary_output && axis == null)
+                {
+                    var array_is_nonempty = math_ops.reduce_prod(array_ops.shape(arr)) > 0;
+                    var output_size = math_ops.cast(array_is_nonempty, dtypes.int32) * (math_ops.reduce_max(arr) + 1);
+                    if (minlength != null)
+                        output_size = math_ops.maximum(minlength, output_size);
+                    if (maxlength != null)
+                        output_size = math_ops.minimum(maxlength, output_size);
+                    var weights = constant_op.constant(new long[0], dtype: dtype);
+                    return tf.Context.ExecuteOp("Bincount", name, new ExecuteOpArgs(arr, output_size, weights));
+                }
+
+                throw new NotImplementedException("");
+            });
 
         /// <summary>
         /// Returns the complex conjugate of a complex number.
@@ -681,6 +851,67 @@ namespace Tensorflow
         public static Tensor tanh(Tensor x, string name = null)
             => gen_math_ops.tanh(x, name);
 
+        public static Tensor tensordot(Tensor x, Tensor y, int[] axes, string name = null)
+        {
+            Tensor _tensordot_reshape(Tensor a, int[] axes, bool flipped = false)
+            {
+                if (a.TensorShape.is_fully_defined() && isinstance(axes, (typeof(List<object>), typeof(Tuple))))
+                {
+                    var shape_a = a.TensorShape.as_list();
+
+                    // axes
+                    int iter = 0;
+                    foreach (int i in axes)
+                    {
+                        if (i >= 0)
+                            axes[0 + iter] = i;
+                        else
+                            axes[0 + iter] = i + len(shape_a);
+                        iter++;
+                    }
+
+                    // free
+                    int[] free = { };
+                    iter = 0;
+                    foreach (int i in Enumerable.Range(0, len(axes)))
+                        if (!Array.Exists(axes, i => i == i))
+                            free[free.Length] = i;
+
+                    // free_dims
+                    int[] free_dims = { };
+                    foreach (int i in free)
+                        free_dims[free_dims.Length] = shape_a[i];
+
+                    int prod_free = (int)np.prod(free_dims);
+
+                    // prod_axes
+                    int[] prod_axes_pre = { };
+                    foreach (int i in axes)
+                        prod_axes_pre[prod_axes_pre.Length] = shape_a[i];
+                    int prod_axes = (int)np.prod(prod_axes_pre);
+
+                    // perm
+                    Tensor perm;
+                    if (flipped)
+                        perm = ops.convert_to_tensor(list(free)) + ops.convert_to_tensor(free);
+                    else
+                        perm = ops.convert_to_tensor(list(free)) + ops.convert_to_tensor(free)
+                                                                 + ops.convert_to_tensor(list(axes));
+
+                    // new_shape
+                    TensorShape new_shape;
+                    if (flipped)
+                        new_shape = new TensorShape(new int[] { prod_axes, prod_free });
+                    else
+                        new_shape = new TensorShape(new int[] { prod_free, prod_axes });
+                }
+
+                throw new NotImplementedException("_tensordot_reshape");
+            }
+
+            throw new NotImplementedException("tensordot");
+        }
+
         public static Tensor truediv(Tensor x, Tensor y, string name = null)
             => _truediv_python3(x, y, name);
 
@@ -691,6 +922,22 @@ namespace Tensorflow
                 name = scope;
                 var x_dtype = x.dtype.as_base_dtype();
                 var y_dtype = y.dtype.as_base_dtype();
+
+                if (x_dtype != y_dtype)
+                    throw new TypeError($"x and y must have the same dtype, got {x_dtype} != {y_dtype}");
+
+                var dtype = x_dtype switch
+                {
+                    TF_DataType.TF_UINT8 => TF_DataType.TF_FLOAT,
+                    TF_DataType.TF_INT8 => TF_DataType.TF_FLOAT,
+                    TF_DataType.TF_INT16 => TF_DataType.TF_FLOAT,
+                    TF_DataType.TF_UINT16 => TF_DataType.TF_FLOAT,
+                    TF_DataType.TF_INT32 => TF_DataType.TF_DOUBLE,
+                    TF_DataType.TF_INT64 => TF_DataType.TF_DOUBLE,
+                    _ => x_dtype
+                };
+                x = cast(x, dtype);
+                y = cast(y, dtype);
 
                 return gen_math_ops.real_div(x, y, name: name);
             });

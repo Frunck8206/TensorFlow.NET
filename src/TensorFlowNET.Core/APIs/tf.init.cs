@@ -20,12 +20,15 @@ namespace Tensorflow
 {
     public partial class tensorflow
     {
-        public IInitializer constant_initializer<T>(T value, TF_DataType dtype = TF_DataType.TF_FLOAT, bool verify_shape = false) 
+        public InitializersImpl initializers { get; } = new InitializersImpl();
+
+        public IInitializer constant_initializer<T>(T value, TF_DataType dtype = TF_DataType.TF_FLOAT, bool verify_shape = false)
             => new Constant<T>(value, dtype: dtype, verify_shape: verify_shape);
         public IInitializer zeros_initializer => new Zeros();
         public IInitializer ones_initializer => new Ones();
         public IInitializer glorot_uniform_initializer => new GlorotUniform();
-        public IInitializer uniform_initializer => new RandomUniform();
+        public IInitializer random_uniform_initializer => new RandomUniform();
+        public IInitializer orthogonal_initializer => new Orthogonal();
 
         public variable_scope variable_scope(string name,
                string default_name = null,
@@ -68,7 +71,7 @@ namespace Tensorflow
         /// </summary>
         /// <param name="factor"></param>
         /// <param name="mode"></param>
-        /// <param name="distribution"></param>
+        /// <param name="uniform"></param>
         /// <param name="seed"></param>
         /// <param name="dtype"></param>
         /// <returns></returns>
@@ -82,5 +85,20 @@ namespace Tensorflow
                 uniform: uniform,
                 seed: seed,
                 dtype: dtype);
+
+        public class InitializersImpl
+        {
+            public IInitializer random_normal_initializer(float mean = 0.0f,
+                float stddev = 0.05f,
+                int? seed = null,
+                TF_DataType dtype = TF_DataType.TF_FLOAT) => new RandomNormal(mean: mean,
+                    stddev: stddev,
+                    seed: seed,
+                    dtype: dtype);
+
+            public IInitializer zeros_initializer(TensorShape shape = null,
+                TF_DataType dtype = TF_DataType.TF_FLOAT) => new Zeros(shape: shape,
+                    dtype: dtype);
+        }
     }
 }

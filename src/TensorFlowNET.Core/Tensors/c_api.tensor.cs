@@ -31,13 +31,7 @@ namespace Tensorflow
         /// <param name="len">size_t</param>
         /// <returns></returns>
         [DllImport(TensorFlowLibName)]
-        public static extern IntPtr TF_AllocateTensor(TF_DataType dtype, IntPtr dims, int num_dims, UIntPtr len);
-
-        [DllImport(TensorFlowLibName)]
         public static extern IntPtr TF_AllocateTensor(TF_DataType dtype, long[] dims, int num_dims, ulong len);
-
-        [DllImport(TensorFlowLibName)]
-        public static extern IntPtr TF_AllocateTensor(TF_DataType dtype, long[] dims, int num_dims, UIntPtr len);
 
         /// <summary>
         /// returns the sizeof() for the underlying type corresponding to the given TF_DataType enum value.
@@ -56,7 +50,7 @@ namespace Tensorflow
 
         /// <summary>
         /// Return the length of the tensor in the "dim_index" dimension.
-        /// REQUIRES: 0 <= dim_index < TF_NumDims(tensor)
+        /// REQUIRES: 0 &lt;= dim_index &lt; TF_NumDims(tensor)
         /// </summary>
         /// <param name="tensor"></param>
         /// <param name="dim_index"></param>
@@ -78,6 +72,9 @@ namespace Tensorflow
         [DllImport(TensorFlowLibName)]
         public static extern IntPtr TF_NewTensor(TF_DataType dataType, long[] dims, int num_dims, IntPtr data, UIntPtr len, Deallocator deallocator, ref DeallocatorArgs deallocator_arg);
 
+        [DllImport(TensorFlowLibName)]
+        public static extern TF_Tensor TF_NewTensor(TF_DataType dataType, long[] dims, int num_dims, IntPtr data, long len, DeallocatorV2 deallocator, IntPtr args);
+
         /// <summary>
         /// Return a new tensor that holds the bytes data[0,len-1]
         /// </summary>
@@ -90,7 +87,7 @@ namespace Tensorflow
         /// <param name="deallocator_arg"></param>
         /// <returns></returns>
         [DllImport(TensorFlowLibName)]
-        public static extern IntPtr TF_NewTensor(TF_DataType dataType, long[] dims, int num_dims, IntPtr data, UIntPtr len, Deallocator deallocator, IntPtr deallocator_arg);
+        public static extern IntPtr TF_NewTensor(TF_DataType dataType, long[] dims, int num_dims, IntPtr data, ulong len, Deallocator deallocator, IntPtr deallocator_arg);
 
         /// <summary>
         /// Return a new tensor that holds the bytes data[0,len-1]
@@ -100,12 +97,10 @@ namespace Tensorflow
         /// <param name="num_dims"></param>
         /// <param name="data"></param>
         /// <param name="len">num_bytes, ex: 6 * sizeof(float)</param>
-        /// <param name="deallocator"></param>
-        /// <param name="deallocator_arg"></param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe IntPtr TF_NewTensor(TF_DataType dataType, long[] dims, int num_dims, IntPtr data, UIntPtr len)
+        public static unsafe IntPtr TF_NewTensor(TF_DataType dataType, long[] dims, int num_dims, IntPtr data, ulong len)
         {
-            return TF_NewTensor(dataType, dims, num_dims, data, len, EmptyDeallocator, DeallocatorArgs.Empty);
+            return c_api.TF_NewTensor(dataType, dims, num_dims, data, len, EmptyDeallocator, DeallocatorArgs.Empty);
         }
         /// <summary>
         /// Return a new tensor that holds the bytes data[0,len-1]
@@ -115,10 +110,8 @@ namespace Tensorflow
         /// <param name="num_dims"></param>
         /// <param name="data"></param>
         /// <param name="len">num_bytes, ex: 6 * sizeof(float)</param>
-        /// <param name="deallocator"></param>
-        /// <param name="deallocator_arg"></param>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static unsafe IntPtr TF_NewTensor(TF_DataType dataType, long[] dims, int num_dims, void* data, UIntPtr len)
+        public static unsafe IntPtr TF_NewTensor(TF_DataType dataType, long[] dims, int num_dims, void* data, ulong len)
         {
             return TF_NewTensor(dataType, dims, num_dims, new IntPtr(data), len);
         }
@@ -171,7 +164,7 @@ namespace Tensorflow
         /// <param name="len">size_t</param>
         /// <returns></returns>
         [DllImport(TensorFlowLibName)]
-        public static extern UIntPtr TF_StringEncodedSize(UIntPtr len);
+        public static extern ulong TF_StringEncodedSize(ulong len);
 
         /// <summary>
         /// Encode the string `src` (`src_len` bytes long) into `dst` in the format
@@ -186,10 +179,34 @@ namespace Tensorflow
         /// <param name="status">TF_Status*</param>
         /// <returns>On success returns the size in bytes of the encoded string.</returns>
         [DllImport(TensorFlowLibName)]
-        public static extern unsafe ulong TF_StringEncode(byte* src, UIntPtr src_len, sbyte* dst, UIntPtr dst_len, IntPtr status);
+        public static extern unsafe ulong TF_StringEncode(byte* src, ulong src_len, byte* dst, ulong dst_len, SafeStatusHandle status);
 
         [DllImport(TensorFlowLibName)]
-        public static extern unsafe ulong TF_StringEncode(IntPtr src, ulong src_len, IntPtr dst, ulong dst_len, IntPtr status);
+        public static extern void TF_StringInit(IntPtr t);
+
+        [DllImport(TensorFlowLibName)]
+        public static extern void TF_StringCopy(IntPtr dst, byte[] text, long size);
+
+        [DllImport(TensorFlowLibName)]
+        public static extern void TF_StringCopy(IntPtr dst, string text, long size);
+
+        [DllImport(TensorFlowLibName)]
+        public static extern void TF_StringAssignView(IntPtr dst, IntPtr text, long size);
+
+        [DllImport(TensorFlowLibName)]
+        public static extern IntPtr TF_StringGetDataPointer(IntPtr tst);
+
+        [DllImport(TensorFlowLibName)]
+        public static extern TF_TString_Type TF_StringGetType(IntPtr tst);
+
+        [DllImport(TensorFlowLibName)]
+        public static extern ulong TF_StringGetSize(IntPtr tst);
+
+        [DllImport(TensorFlowLibName)]
+        public static extern ulong TF_StringGetCapacity(IntPtr tst);
+
+        [DllImport(TensorFlowLibName)]
+        public static extern void TF_StringDealloc(IntPtr tst);
 
         /// <summary>
         /// Decode a string encoded using TF_StringEncode.
@@ -201,10 +218,7 @@ namespace Tensorflow
         /// <param name="status">TF_Status*</param>
         /// <returns></returns>
         [DllImport(TensorFlowLibName)]
-        public static extern ulong TF_StringDecode(IntPtr src, ulong src_len, IntPtr dst, ref ulong dst_len, IntPtr status);
-
-        [DllImport(TensorFlowLibName)]
-        public static extern unsafe UIntPtr TF_StringDecode(byte* src, UIntPtr src_len, byte** dst, UIntPtr* dst_len, IntPtr status);
+        public static extern unsafe ulong TF_StringDecode(byte* src, ulong src_len, byte** dst, ref ulong dst_len, SafeStatusHandle status);
 
 
         public static c_api.Deallocator EmptyDeallocator = FreeNothingDeallocator;

@@ -15,6 +15,9 @@
 ******************************************************************************/
 
 using System.Collections.Generic;
+using System.Diagnostics;
+using Tensorflow.Contexts;
+using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
@@ -22,65 +25,101 @@ namespace Tensorflow
     {
         public static NameScope name_scope(string name,
             string default_name = "",
-            object values = null) => new NameScope(name, default_name, values);
+            object values = null,
+            bool skip_on_eager = true) => new NameScope(name, default_name, values: values, skip_on_eager: skip_on_eager);
 
         /// <summary>
         /// Returns a context manager that creates hierarchical names for operations.
         /// </summary>
-        public class NameScope : IObjectLife
+        public class NameScope : ITensorFlowObject
         {
             public string _name;
             public string _default_name;
             public object _values;
-            public string _name_scope;
-            public string old_stack = "";
-            
-            public NameScope(string name, string default_name = "", object values = null)
+            public string scope_name;
+            public string old_scope_name = "";
+            bool _skip_on_eager = false;
+
+            public NameScope(string name, string default_name = "", object values = null, bool skip_on_eager = true)
             {
                 _name = name;
                 _default_name = default_name;
                 _values = values;
+                _skip_on_eager = skip_on_eager;
             }
 
+            [DebuggerStepThrough]
             public void __enter__()
             {
-                _name = _name ?? _default_name;
-                if (_name.EndsWith("basic_r_n_n_cell"))
+                if (tf.Context.executing_eagerly())
                 {
-
+                    (scope_name, old_scope_name) = enter_eager_name_scope(tf.Context, _name);
                 }
-                Graph g = null;
+                else
+                {
+                    _name = _name ?? _default_name;
+                    Graph g = null;
 
-                if (_values is List<Tensor> vList)
-                    g = _get_graph_from_inputs(vList.ToArray());
-                else if (_values is Tensor[] vArray)
-                    g = _get_graph_from_inputs(vArray);
+                    if (_values is List<Tensor> vList)
+                        g = _get_graph_from_inputs(vList.ToArray());
+                    else if (_values is Tensor[] vArray)
+                        g = _get_graph_from_inputs(vArray);
 
-                if (g == null)
-                    g = get_default_graph();
+                    if (g == null)
+                        g = get_default_graph();
 
-                old_stack = g._name_stack;
-                _name_scope = g.name_scope(_name);
+                    old_scope_name = g._name_stack;
+                    scope_name = g.name_scope(_name);
+                }
             }
 
+            private (string, string) enter_eager_name_scope(Context ctx, string name)
+            {
+                if (_skip_on_eager)
+                    return (null, null);
+
+                if (name == null)
+                    name = _default_name;
+
+                var scope_name = name;
+                var old_name = ctx.ScopeName;
+                // A trailing slash breaks out of nested name scopes, indicating a
+                // fully specified scope name, for compatibility with Graph.name_scope.
+                if (!name.EndsWith("/"))
+                {
+                    scope_name = name + "/";
+                    if (!string.IsNullOrEmpty(old_name))
+                        scope_name = old_name + scope_name;
+                }
+
+                ctx.ScopeName = scope_name;
+                return (scope_name, old_name);
+            }
+
+            [DebuggerStepThrough]
             public void Dispose()
             {
-                var g = get_default_graph();
-                g._name_stack = old_stack;
+                if (tf.Context.executing_eagerly())
+                    tf.Context.ScopeName = old_scope_name;
+                else
+                    get_default_graph()._name_stack = old_scope_name;
             }
 
+            [DebuggerStepThrough]
             public void __exit__()
             {
             }
 
+            [DebuggerNonUserCode]
             public void __init__()
             {
-                
+
             }
 
+            [DebuggerNonUserCode]
             public void __del__()
             {
-                
+
             }
 
             /// <summary>
@@ -89,7 +128,7 @@ namespace Tensorflow
             /// <param name="ns"></param>
             public static implicit operator string(NameScope ns)
             {
-                return ns._name_scope;
+                return ns.scope_name;
             }
         }
     }

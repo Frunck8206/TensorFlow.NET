@@ -29,10 +29,10 @@ namespace Tensorflow
             int size = Marshal.SizeOf<TF_Output>();
             var return_output_handle = Marshal.AllocHGlobal(size * num_return_outputs);
 
-            c_api.TF_GraphImportGraphDefWithReturnOutputs(_handle, graph_def, opts, return_output_handle, num_return_outputs, s);
+            c_api.TF_GraphImportGraphDefWithReturnOutputs(_handle, graph_def.Handle, opts.Handle, return_output_handle, num_return_outputs, s.Handle);
 
-            var tf_output_ptr = (TF_Output*) return_output_handle;
-            for (int i = 0; i < num_return_outputs; i++) 
+            var tf_output_ptr = (TF_Output*)return_output_handle;
+            for (int i = 0; i < num_return_outputs; i++)
                 return_outputs[i] = *(tf_output_ptr + i);
 
             Marshal.FreeHGlobal(return_output_handle);
@@ -53,8 +53,8 @@ namespace Tensorflow
             using (var graph_def = new Buffer(bytes))
             {
                 as_default();
-                c_api.TF_ImportGraphDefOptionsSetPrefix(opts, prefix);
-                c_api.TF_GraphImportGraphDef(_handle, graph_def, opts, status);
+                c_api.TF_ImportGraphDefOptionsSetPrefix(opts.Handle, prefix);
+                c_api.TF_GraphImportGraphDef(_handle, graph_def.Handle, opts.Handle, status.Handle);
                 status.Check(true);
                 return status.Code == TF_Code.TF_OK;
             }

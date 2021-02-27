@@ -15,6 +15,7 @@
 ******************************************************************************/
 
 using System;
+using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
@@ -39,22 +40,7 @@ namespace Tensorflow
                 container: container,
                 shared_name: shared_name);
 
-        public static Tensor assign(Tensor @ref, object value,
-            bool validate_shape = true,
-            bool use_locking = true,
-            string name = null)
-        {
-            if (@ref.dtype.is_ref_dtype())
-                return gen_state_ops.assign(@ref,
-                    value,
-                    validate_shape: validate_shape,
-                    use_locking: use_locking,
-                    name: name);
-
-            return @ref.assign((Tensor)value, name: name);
-        }
-
-        public static Tensor assign(RefVariable @ref, object value,
+        public static Tensor assign<T>(T @ref, object value,
             bool validate_shape = true,
             bool use_locking = true,
             string name = null)
@@ -66,13 +52,30 @@ namespace Tensorflow
                 name: name);
         }
 
-        public static Tensor assign_sub(RefVariable @ref,
+        public static Tensor assign(IVariableV1 @ref, object value,
+            bool validate_shape = true,
+            bool use_locking = true,
+            string name = null)
+        {
+            if (@ref.dtype.is_ref_dtype())
+                return gen_state_ops.assign(@ref,
+                    value,
+                    validate_shape: validate_shape,
+                    use_locking: use_locking,
+                    name: name);
+            else
+                return @ref.assign(value, name: name);
+        }
+
+        public static Tensor assign_sub(IVariableV1 @ref,
             Tensor value,
             bool use_locking = false,
-            string name = null) => gen_state_ops.assign_sub(@ref,
-                value,
-                use_locking: use_locking,
-                name: name);
+            string name = null) => @ref.dtype.is_ref_dtype() ?
+                gen_state_ops.assign_sub(@ref,
+                    value,
+                    use_locking: use_locking,
+                    name: name) :
+                @ref.assign_sub(value, name: name);
 
         //"""Update 'ref' by adding 'value' to it.
         //
@@ -94,17 +97,18 @@ namespace Tensorflow
         //  Returns:
         //    Same as "ref".  Returned as a convenience for operations that want
         //    to use the new value after the variable has been updated.
-        public static Tensor assign_add<T>(RefVariable @ref,
+        public static Tensor assign_add<T>(IVariableV1 @ref,
             T value,
             bool use_locking = false,
             string name = null)
         {
-            if (@ref.dtype.is_ref_dtype())
+            if (tf.executing_eagerly())
+                return @ref.assign_add(value, use_locking: use_locking, name: name);
+            else
                 return gen_state_ops.assign_add(@ref, value, use_locking: use_locking, name: name);
-            throw new NotImplementedException("assign_add");
         }
 
-        public static Tensor scatter_add(RefVariable @ref, Tensor indices, Tensor updates, bool use_locking = false, string name = null)
+        public static Tensor scatter_add(IVariableV1 @ref, Tensor indices, Tensor updates, bool use_locking = false, string name = null)
         {
             if (@ref.dtype.is_ref_dtype())
                 return gen_state_ops.scatter_add(@ref, indices, updates, use_locking: use_locking, name: name);

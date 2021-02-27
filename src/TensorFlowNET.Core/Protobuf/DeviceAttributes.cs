@@ -34,17 +34,17 @@ namespace Tensorflow {
             "IAEoCRITCgtkZXZpY2VfdHlwZRgCIAEoCRIUCgxtZW1vcnlfbGltaXQYBCAB",
             "KAMSLAoIbG9jYWxpdHkYBSABKAsyGi50ZW5zb3JmbG93LkRldmljZUxvY2Fs",
             "aXR5EhMKC2luY2FybmF0aW9uGAYgASgGEhwKFHBoeXNpY2FsX2RldmljZV9k",
-            "ZXNjGAcgASgJQnYKGG9yZy50ZW5zb3JmbG93LmZyYW1ld29ya0IWRGV2aWNl",
-            "QXR0cmlidXRlc1Byb3Rvc1ABWj1naXRodWIuY29tL3RlbnNvcmZsb3cvdGVu",
-            "c29yZmxvdy90ZW5zb3JmbG93L2dvL2NvcmUvZnJhbWV3b3Jr+AEBYgZwcm90",
-            "bzM="));
+            "ZXNjGAcgASgJQpEBChhvcmcudGVuc29yZmxvdy5mcmFtZXdvcmtCFkRldmlj",
+            "ZUF0dHJpYnV0ZXNQcm90b3NQAVpYZ2l0aHViLmNvbS90ZW5zb3JmbG93L3Rl",
+            "bnNvcmZsb3cvdGVuc29yZmxvdy9nby9jb3JlL2ZyYW1ld29yay9kZXZpY2Vf",
+            "YXR0cmlidXRlc19nb19wcm90b/gBAWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
-          new pbr::GeneratedClrTypeInfo(null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.InterconnectLink), global::Tensorflow.InterconnectLink.Parser, new[]{ "DeviceId", "Type", "Strength" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.LocalLinks), global::Tensorflow.LocalLinks.Parser, new[]{ "Link" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.DeviceLocality), global::Tensorflow.DeviceLocality.Parser, new[]{ "BusId", "NumaNode", "Links" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.DeviceAttributes), global::Tensorflow.DeviceAttributes.Parser, new[]{ "Name", "DeviceType", "MemoryLimit", "Locality", "Incarnation", "PhysicalDeviceDesc" }, null, null, null)
+          new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.InterconnectLink), global::Tensorflow.InterconnectLink.Parser, new[]{ "DeviceId", "Type", "Strength" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.LocalLinks), global::Tensorflow.LocalLinks.Parser, new[]{ "Link" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.DeviceLocality), global::Tensorflow.DeviceLocality.Parser, new[]{ "BusId", "NumaNode", "Links" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.DeviceAttributes), global::Tensorflow.DeviceAttributes.Parser, new[]{ "Name", "DeviceType", "MemoryLimit", "Locality", "Incarnation", "PhysicalDeviceDesc" }, null, null, null, null)
           }));
     }
     #endregion
@@ -522,7 +522,7 @@ namespace Tensorflow {
       }
       if (other.links_ != null) {
         if (links_ == null) {
-          links_ = new global::Tensorflow.LocalLinks();
+          Links = new global::Tensorflow.LocalLinks();
         }
         Links.MergeFrom(other.Links);
       }
@@ -547,9 +547,9 @@ namespace Tensorflow {
           }
           case 26: {
             if (links_ == null) {
-              links_ = new global::Tensorflow.LocalLinks();
+              Links = new global::Tensorflow.LocalLinks();
             }
-            input.ReadMessage(links_);
+            input.ReadMessage(Links);
             break;
           }
         }
@@ -799,7 +799,7 @@ namespace Tensorflow {
       }
       if (other.locality_ != null) {
         if (locality_ == null) {
-          locality_ = new global::Tensorflow.DeviceLocality();
+          Locality = new global::Tensorflow.DeviceLocality();
         }
         Locality.MergeFrom(other.Locality);
       }
@@ -834,9 +834,9 @@ namespace Tensorflow {
           }
           case 42: {
             if (locality_ == null) {
-              locality_ = new global::Tensorflow.DeviceLocality();
+              Locality = new global::Tensorflow.DeviceLocality();
             }
-            input.ReadMessage(locality_);
+            input.ReadMessage(Locality);
             break;
           }
           case 49: {

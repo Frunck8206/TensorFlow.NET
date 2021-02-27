@@ -1,7 +1,8 @@
-﻿using System;
-using System.Reflection;
-using BenchmarkDotNet.Configs;
+﻿using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Running;
+using System;
+using System.Reflection;
+using Tensorflow.Benchmark.Leak;
 
 namespace TensorFlowBenchmark
 {
@@ -9,6 +10,8 @@ namespace TensorFlowBenchmark
     {
         static void Main(string[] args)
         {
+            new GpuLeakByCNN().Run();
+
             if (args?.Length > 0)
             {
                 for (int i = 0; i < args.Length; i++)
@@ -20,7 +23,9 @@ namespace TensorFlowBenchmark
             }
             else
             {
+#pragma warning disable CS0618 // Type or member is obsolete
                 BenchmarkSwitcher.FromAssembly(Assembly.GetExecutingAssembly()).Run(args, ManualConfig.Create(DefaultConfig.Instance).With(ConfigOptions.DisableOptimizationsValidator));
+#pragma warning restore CS0618 // Type or member is obsolete
             }
 
             Console.ReadLine();

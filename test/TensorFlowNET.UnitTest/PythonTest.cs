@@ -1,9 +1,9 @@
-﻿using System;
-using System.Collections;
-using System.Linq;
-using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Newtonsoft.Json.Linq;
 using NumSharp;
+using System;
+using System.Collections;
+using System.Linq;
 using Tensorflow;
 using static Tensorflow.Binding;
 
@@ -16,10 +16,7 @@ namespace TensorFlowNET.UnitTest
     {
         #region python compatibility layer
         protected PythonTest self { get => this; }
-        protected object None
-        {
-            get { return null; }
-        }
+        protected int None => -1;
         #endregion
 
         #region pytest assertions
@@ -40,7 +37,8 @@ namespace TensorFlowNET.UnitTest
             {
                 /*if (g[i] is NDArray && e[i] is NDArray)
                     assertItemsEqual((g[i] as NDArray).GetData<object>(), (e[i] as NDArray).GetData<object>());
-                else*/ if (e[i] is ICollection && g[i] is ICollection)
+                else*/
+                if (e[i] is ICollection && g[i] is ICollection)
                     assertEqual(g[i], e[i]);
                 else
                     Assert.AreEqual(e[i], g[i], $"Items differ at index {i}, expected {e[i]} but got {g[i]}");
@@ -150,7 +148,7 @@ namespace TensorFlowNET.UnitTest
 
         protected object _eval_tensor(object tensor)
         {
-            if (tensor == None)
+            if (tensor == null)
                 return None;
             //else if (callable(tensor))
             //     return self._eval_helper(tensor())
@@ -186,11 +184,11 @@ namespace TensorFlowNET.UnitTest
             {
                 using (var sess = tf.Session())
                 {
-                    var ndarray=tensor.eval(sess);
+                    var ndarray = tensor.eval(sess);
                     if (typeof(T) == typeof(double))
                     {
                         double x = ndarray;
-                        result=x;
+                        result = x;
                     }
                     else if (typeof(T) == typeof(int))
                     {
@@ -259,7 +257,7 @@ namespace TensorFlowNET.UnitTest
             return s.as_default();
         }
 
-        private IObjectLife _constrain_devices_and_set_default(Session sess, bool useGpu, bool forceGpu)
+        private ITensorFlowObject _constrain_devices_and_set_default(Session sess, bool useGpu, bool forceGpu)
         {
             //def _constrain_devices_and_set_default(self, sess, use_gpu, force_gpu):
             //"""Set the session and its graph to global default and constrain devices."""

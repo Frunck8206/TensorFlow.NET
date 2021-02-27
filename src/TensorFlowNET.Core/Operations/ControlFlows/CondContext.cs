@@ -27,7 +27,9 @@ namespace Tensorflow.Operations
     /// </summary>
     public class CondContext : ControlFlowContext, IProtoBuf<CondContextDef, CondContext>
     {
+#pragma warning disable CS0108 // Member hides inherited member; missing new keyword
         private Dictionary<string, Tensor> _external_values = new Dictionary<string, Tensor>();
+#pragma warning restore CS0108 // Member hides inherited member; missing new keyword
 
         /// <summary>
         /// 
@@ -107,7 +109,7 @@ namespace Tensorflow.Operations
                     _values.Add(result.name);
                     _external_values[result.name] = result;
                 }
-                
+
                 tf_with(ops.control_dependencies(null), ctrl =>
                 {
                     var results = control_flow_ops._SwitchRefOrTensor(result, _pred);

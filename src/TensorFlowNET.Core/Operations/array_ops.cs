@@ -18,6 +18,8 @@ using NumSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Tensorflow.Contexts;
+using Tensorflow.Eager;
 using Tensorflow.Framework;
 using static Tensorflow.Binding;
 
@@ -25,11 +27,38 @@ namespace Tensorflow
 {
     public class array_ops
     {
-        public static Tensor placeholder_with_default<T>(T input, int[] shape, string name = null) 
+        public static Tensor placeholder_with_default<T>(T input, int[] shape, string name = null)
             => gen_array_ops.placeholder_with_default(input, shape, name);
 
+        /// <summary>
+        ///    An identity op that triggers an error if a gradient is requested.
+        /// </summary>
+        /// <param name="input">
+        ///    any tensor.
+        /// </param>
+        /// <param name="name">
+        /// If specified, the created operation in the graph will be this one, otherwise it will be named 'PreventGradient'.
+        /// </param>
+        /// <param name="message">
+        ///    Will be printed in the error when anyone tries to differentiate
+        ///    this operation.
+        /// </param>
+        /// <returns>
+        ///    the same input tensor.
+        ///    The Operation can be fetched from the resulting Tensor, by fetching the Operation property from the result.
+        /// </returns>
+        /// <remarks>
+        ///    When executed in a graph, this op outputs its input tensor as-is.
+        ///    
+        ///    When building ops to compute gradients, the TensorFlow gradient system
+        ///    will return an error when trying to lookup the gradient of this op,
+        ///    because no gradient must ever be registered for this function.  This
+        ///    op exists to prevent subtle bugs from silently returning unimplemented
+        ///    gradients in some corner cases.
+        /// </remarks>
         public static Tensor prevent_gradient(Tensor input, string message = "", string name = null)
-            => gen_array_ops.prevent_gradient(input, message: message, name: name);
+            => tf.Context.ExecuteOp("PreventGradient", name, new ExecuteOpArgs(input)
+                .SetAttributes(new { message }));
 
         internal static Tensor constant(object value,
             TF_DataType dtype = TF_DataType.DtInvalid,
@@ -45,27 +74,53 @@ namespace Tensorflow
         public static Tensor zeros(TensorShape shape, TF_DataType dtype = TF_DataType.TF_FLOAT, string name = null)
         {
             dtype = dtype.as_base_dtype();
-            return tf_with(ops.name_scope(name, "zeros", shape), scope =>
+
+            if (tf.executing_eagerly())
             {
-                name = scope;
-                switch (dtype)
+                return tf_with(ops.name_scope(name, "zeros", shape), scope =>
                 {
-                    case TF_DataType.TF_BOOL:
-                        return _constant_if_small(false, shape, dtype, name);
-                    case TF_DataType.TF_DOUBLE:
-                        return _constant_if_small(0.0D, shape, dtype, name);
-                    case TF_DataType.TF_FLOAT:
-                        return _constant_if_small(0.0F, shape, dtype, name);
-                    case TF_DataType.TF_INT64:
-                        return _constant_if_small(0l, shape, dtype, name);
-                    case TF_DataType.TF_INT32:
-                        return _constant_if_small(0, shape, dtype, name);
-                    case TF_DataType.TF_INT8:
-                        return _constant_if_small<byte>(0, shape, dtype, name);
-                    default:
-                        throw new TypeError("can't find type for zeros");
-                }
-            });
+                    name = scope;
+                    var shape_tensor = constant_op._tensor_shape_tensor_conversion_function(shape);
+                    Tensor zeros = null;
+                    switch (dtype)
+                    {
+                        case TF_DataType.TF_DOUBLE:
+                            zeros = constant(0d);
+                            break;
+                        case TF_DataType.TF_FLOAT:
+                            zeros = constant(0f);
+                            break;
+                        default:
+                            zeros = constant(0);
+                            break;
+                    }
+                    return fill(shape_tensor, zeros, name: name);
+                });
+            }
+            else
+            {
+                return tf_with(ops.name_scope(name, "zeros", shape), scope =>
+                {
+                    name = scope;
+                    switch (dtype)
+                    {
+                        case TF_DataType.TF_BOOL:
+                            return _constant_if_small(false, shape, dtype, name);
+                        case TF_DataType.TF_DOUBLE:
+                            return _constant_if_small(0.0D, shape, dtype, name);
+                        case TF_DataType.TF_FLOAT:
+                            return _constant_if_small(0.0F, shape, dtype, name);
+                        case TF_DataType.TF_INT64:
+                            return _constant_if_small(0L, shape, dtype, name);
+                        case TF_DataType.TF_INT32:
+                            return _constant_if_small(0, shape, dtype, name);
+                        case TF_DataType.TF_INT8:
+                            return _constant_if_small<byte>(0, shape, dtype, name);
+                        default:
+                            throw new TypeError("can't find type for zeros");
+                    }
+                });
+            }
         }
 
         public static Tensor boolean_mask<T1, T2>(T1 tensor, T2 mask, string name = "boolean_mask", int axis = 0)
@@ -86,10 +141,10 @@ namespace Tensorflow
                 var shape1 = concat(new[]
                 {
                     shape(tensor_tensor)[$":{axis}"],
-                    tf.expand_dims(leading_size, 0),
+                    leading_size,
                     shape(tensor_tensor)[$"{axis + ndims_mask}:"]
                 }, 0);
-                tensor_tensor = reshape(tensor, shape1);
+                tensor_tensor = reshape(tensor_tensor, shape1);
                 var first_dim = shape_tensor.dims.Skip(axis).Take(ndims_mask).First();
                 var s1 = tensor_shape.as_shape(shape_tensor.dims.Take(axis).ToArray());
                 var s2 = s1.concatenate(new[] { first_dim }).concatenate(shape_tensor.dims.Skip(axis + ndims_mask).ToArray());
@@ -125,7 +180,7 @@ namespace Tensorflow
                     default:
                         throw new TypeError("can't find type for zeros");
                 }
-                
+
             });
         }
 
@@ -136,20 +191,20 @@ namespace Tensorflow
 
         private static Tensor _constant_if_small<T>(T value, TensorShape shape, TF_DataType dtype, string name)
         {
-            Tensor tShape = null;
+            Tensor shape_t = null;
             if (shape.size < 1000)
             {
                 return constant_op.constant(value, shape: shape, dtype: dtype, name: name);
             }
             else
             {
-                tShape = constant_op._tensor_shape_tensor_conversion_function(shape);
+                shape_t = constant_op._tensor_shape_tensor_conversion_function(shape);
                 var c = constant_op.constant(0, dtype: dtype);
-                return gen_array_ops.fill(tShape, c, name: name);
+                return gen_array_ops.fill(shape_t, c, name: name);
             }
         }
 
-        public static Tensor _autopacking_conversion_function(object[] v, TF_DataType dtype = TF_DataType.DtInvalid, string name = null, bool as_ref = false)
+        public static Tensor _autopacking_conversion_function(IEnumerable<object> v, TF_DataType dtype = TF_DataType.DtInvalid, string name = null, bool as_ref = false)
         {
             var inferred_dtype = _get_dtype_from_nested_lists(v);
             if (dtype == TF_DataType.DtInvalid)
@@ -158,11 +213,11 @@ namespace Tensorflow
             return _autopacking_helper(v, dtype, name == null ? "packed" : name);
         }
 
-        private static TF_DataType _get_dtype_from_nested_lists(object[] list_or_tuple)
+        private static TF_DataType _get_dtype_from_nested_lists(IEnumerable<object> list_or_tuple)
         {
             TF_DataType dtype = TF_DataType.DtInvalid;
 
-            foreach(var obj in list_or_tuple)
+            foreach (var obj in list_or_tuple)
             {
                 switch (obj)
                 {
@@ -178,11 +233,21 @@ namespace Tensorflow
             return dtype;
         }
 
-        public static Tensor _autopacking_helper(object[] list_or_tuple, TF_DataType dtype, string name)
+        /// <summary>
+        /// Converts the given list or tuple to a tensor by packing.
+        /// </summary>
+        /// <param name="list_or_tuple">A (possibly nested) list or tuple containing a tensor.</param>
+        /// <param name="dtype"></param>
+        /// <param name="name"></param>
+        /// <returns>A `tf.Tensor` with value equivalent to `list_or_tuple`.</returns>
+        public static Tensor _autopacking_helper(IEnumerable<object> list_or_tuple, TF_DataType dtype, string name)
         {
             var must_pack = false;
             var converted_elems = new List<object>();
-            return tf_with(ops.name_scope(name), scope =>
+
+            bool switch_to_graph = tf.Context.switched_to_graph(list_or_tuple.ToArray());
+
+            var result = tf_with(ops.name_scope(name), scope =>
             {
                 foreach (var (i, elem) in enumerate(list_or_tuple))
                 {
@@ -190,13 +255,22 @@ namespace Tensorflow
                     must_pack = true;
                 }
 
-                if(must_pack)
+                if (must_pack)
                 {
                     var elems_as_tensors = new List<Tensor>();
                     foreach (var (i, elem) in enumerate(converted_elems))
                     {
-                        if (elem is Tensor tensor)
+                        if (elem is EagerTensor eager_tensor)
+                        {
+                            if (switch_to_graph)
+                                elems_as_tensors.Add(constant_op.constant(eager_tensor.numpy(), dtype: dtype, name: i.ToString()));
+                            else
+                                elems_as_tensors.Add(eager_tensor);
+                        }
+                        else if (elem is Tensor tensor)
+                        {
                             elems_as_tensors.Add(tensor);
+                        }
                         else
                         {
                             var elem_tensor = constant_op.constant(elem, dtype: dtype, name: i.ToString());
@@ -211,13 +285,33 @@ namespace Tensorflow
                     return tf.constant(np.array(new float[0]));
                 }
             });
+
+            if (switch_to_graph)
+                tf.Context.restore_mode();
+
+            return result;
         }
 
-        public static Tensor expand_dims(Tensor input, int axis = -1, string name = null, int dim = -1) 
+        public static Tensor expand_dims(Tensor input, int axis = -1, string name = null, int dim = -1)
             => expand_dims_v2(input, axis, name);
 
-        private static Tensor expand_dims_v2(Tensor input, int axis, string name = null) 
+        private static Tensor expand_dims_v2(Tensor input, int axis, string name = null)
             => gen_array_ops.expand_dims(input, axis, name);
+
+        /// <summary>
+        /// Creates a tensor filled with a scalar value.
+        /// This operation creates a tensor of shape `dims` and fills it with `value`.
+        /// </summary>
+        /// <param name="dims">A 1-D sequence of non-negative numbers.</param>
+        /// <param name="value">A value to fill the returned `tf.Tensor`.</param>
+        /// <param name="name">Optional string. The name of the output `tf.Tensor`.</param>
+        /// <returns>A `tf.Tensor` with shape `dims` and the same dtype as `value`.</returns>
+        public static Tensor fill(Tensor dims, Tensor value, string name = null)
+        {
+            var result = gen_array_ops.fill(dims, value, name: name);
+            // tensor_util.maybe_set_static_shape(result, dims)
+            return result;
+        }
 
         /// <summary>
         /// Returns the rank of a tensor.
@@ -260,11 +354,39 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <param name="optimize"></param>
         /// <returns></returns>
-        public static Tensor ones_like<T>(T tensor, TF_DataType dtype = TF_DataType.DtInvalid, string name = null, bool optimize = true)
-            => ones_like_impl(tensor, dtype, name, optimize);
+        public static Tensor ones_like(Tensor tensor, TF_DataType dtype = TF_DataType.DtInvalid, string name = null, bool optimize = true)
+        {
+            return tf_with(ops.name_scope(name, "ones_like", new Tensor[] { tensor }), scope =>
+            {
+                name = scope;
+                tensor = ops.convert_to_tensor(tensor, name: "tensor");
 
-        public static Tensor reshape<T1, T2>(T1 tensor, T2 shape, string name = null)
-            => gen_array_ops.reshape(tensor, shape, null);
+                // is_fully_defined return unexpected value.
+                if (optimize && tensor_util.to_shape(tensor.shape).is_fully_defined() && dtype != TF_DataType.TF_VARIANT)
+                {
+
+                }
+
+                if (dtype != TF_DataType.DtInvalid && dtype != tensor.dtype && dtype != TF_DataType.TF_VARIANT)
+                {
+                    throw new NotImplementedException("ones_like");
+                    // return ones(shape_internal(tensor, optimize: optimize), dtype: dtype, name: name);
+                }
+                else
+                {
+                    return gen_array_ops.ones_like(tensor, name: name);
+                }
+            });
+        }
+
+        public static Tensor reshape(Tensor tensor, Tensor shape, string name = null)
+            => gen_array_ops.reshape(tensor, shape, name: name);
+
+        public static Tensor reshape(Tensor tensor, TensorShape shape, string name = null)
+            => gen_array_ops.reshape(tensor, shape, name: name);
+
+        public static Tensor reshape(Tensor tensor, object[] shape, string name = null)
+            => gen_array_ops.reshape(tensor, shape, name: name);
 
         private static Tensor ones_like_impl<T>(T tensor, TF_DataType dtype, string name, bool optimize = true)
         {
@@ -276,14 +398,12 @@ namespace Tensorflow
                 if (dtype == TF_DataType.DtInvalid)
                     dtype = tensor1.dtype;
                 var ret = ones(ones_shape, dtype: dtype, name: name);
-                ret.shape = tensor1.shape;
                 return ret;
             });
         }
 
         public static Tensor ones(Tensor shape, TF_DataType dtype = TF_DataType.TF_FLOAT, string name = null)
         {
-            dtype = dtype.as_base_dtype();
             return tf_with(ops.name_scope(name, "ones", new { shape }), scope =>
             {
                 name = scope;
@@ -305,18 +425,34 @@ namespace Tensorflow
             });
         }
 
-        public static Tensor ones(int[] dims, TF_DataType dtype = TF_DataType.TF_FLOAT, string name = null)
-        {
-            dtype = dtype.as_base_dtype();
-            return tf_with(ops.name_scope(name, "ones", new { dims }), scope =>
+        public static Tensor ones(TensorShape shape, TF_DataType dtype = TF_DataType.TF_FLOAT, string name = null)
+            => tf_with(ops.name_scope(name, "ones", shape), scope =>
             {
+                dtype = dtype.as_base_dtype();
                 name = scope;
-                var output = _constant_if_small(1, dims, dtype, name);
-                return output;
-            });
-        }
 
-        public static Tensor one_hot(Tensor indices, int depth, 
+                Tensor ones = null;
+                switch (dtype)
+                {
+                    case TF_DataType.TF_DOUBLE:
+                        ones = constant(1.0d);
+                        break;
+                    case TF_DataType.TF_FLOAT:
+                        ones = constant(1.0f);
+                        break;
+                    default:
+                        ones = constant(1);
+                        break;
+                }
+
+                if (shape.ndim == 0)
+                    return ones;
+
+                var shape_tensor = constant_op._tensor_shape_tensor_conversion_function(shape);
+                return fill(shape_tensor, ones, name: name);
+            });
+
+        public static Tensor one_hot(Tensor indices, Tensor depth,
             Tensor on_value = null,
             Tensor off_value = null,
             TF_DataType dtype = TF_DataType.DtInvalid,
@@ -334,7 +470,7 @@ namespace Tensorflow
                 if (dtype == TF_DataType.DtInvalid)
                     dtype = TF_DataType.TF_FLOAT;
 
-                if(!on_exists)
+                if (!on_exists)
                 {
                     on_value = ops.convert_to_tensor(1, dtype, name: "on_value");
                     on_dtype = dtype;
@@ -371,7 +507,7 @@ namespace Tensorflow
 
         public static Tensor[] unstack(Tensor value, int? num = null, int axis = 0, string name = "unstack")
         {
-            if(num == null)
+            if (num == null)
             {
                 value = ops.convert_to_tensor(value);
                 var value_shape = value.TensorShape;
@@ -383,7 +519,7 @@ namespace Tensorflow
 
         public static Tensor where(Tensor condition, object x = null, object y = null, string name = null)
         {
-            if( x == null && y == null)
+            if (x == null && y == null)
             {
                 return tf_with(ops.name_scope(name, "Where", new { condition }), scope =>
                 {
@@ -392,7 +528,7 @@ namespace Tensorflow
                     return gen_array_ops.where(condition: condition, name: name);
                 });
             }
-            else if(x != null && y != null)
+            else if (x != null && y != null)
             {
                 return gen_array_ops.select(condition, x, y, name);
             }
@@ -402,6 +538,27 @@ namespace Tensorflow
             }
         }
 
+
+        public static Tensor where_v2(Tensor condition, object x = null, object y = null, string name = null)
+        {
+            if (x == null && y == null)
+            {
+                return tf_with(ops.name_scope(name, "Where", new { condition }), scope =>
+                {
+                    name = scope;
+                    condition = ops.convert_to_tensor(condition, preferred_dtype: dtypes.@bool, name: "condition");
+                    return gen_array_ops.where(condition: condition, name: name);
+                });
+            }
+            else if (x != null && y != null)
+            {
+                return gen_array_ops.select_v2(condition, x, y, name);
+            }
+            else
+            {
+                throw new ValueError("x and y must both be non-None or both be None.");
+            }
+        }
         /// <summary>
         /// Returns the shape of a tensor.
         /// </summary>
@@ -415,6 +572,9 @@ namespace Tensorflow
         public static Tensor shape(Tensor input, string name = null, TF_DataType out_type = TF_DataType.TF_INT32)
             => shape_internal(input, name, optimize: true, out_type: out_type);
 
+        public static Tensor shape_v2(Tensor input, string name = null, TF_DataType out_type = TF_DataType.TF_INT32)
+            => shape_internal(input, name, optimize: true, out_type: out_type);
+
         public static Tensor size(Tensor input, string name = null, bool optimize = true, TF_DataType out_type = TF_DataType.TF_INT32)
             => size_internal(input, name, optimize: optimize, out_type: out_type);
 
@@ -424,13 +584,12 @@ namespace Tensorflow
             {
                 name = scope;
 
-                if (!tf.context.executing_eagerly())
+                if (!tf.Context.executing_eagerly())
                 {
-                    var input_tensor = ops.convert_to_tensor(input);
-                    var input_shape = tensor_util.to_shape(input_tensor.shape);
-                    if (optimize && input_tensor.NDims > -1 && input_shape.is_fully_defined())
+                    var input_shape = input.TensorShape;
+                    if (optimize && input.NDims > -1 && input_shape.is_fully_defined())
                     {
-                        var nd = np.array(input_tensor.shape).astype(out_type.as_numpy_dtype());
+                        var nd = np.array(input.shape).astype(out_type.as_numpy_dtype());
                         return constant_op.constant(nd, name: name);
                     }
                 }
@@ -459,6 +618,11 @@ namespace Tensorflow
             });
         }
 
+        public static Tensor tile(Tensor input, Tensor multiples, string name = null)
+        {
+            throw new NotImplementedException("tile");
+        }
+
         public static Tensor zeros_like(Tensor tensor, TF_DataType dtype = TF_DataType.DtInvalid, string name = null, bool optimize = true)
         {
             return tf_with(ops.name_scope(name, "zeros_like", new Tensor[] { tensor }), scope =>
@@ -472,7 +636,7 @@ namespace Tensorflow
 
                 }
 
-                if(dtype != TF_DataType.DtInvalid && dtype != tensor.dtype && dtype != TF_DataType.TF_VARIANT)
+                if (dtype != TF_DataType.DtInvalid && dtype != tensor.dtype && dtype != TF_DataType.TF_VARIANT)
                 {
                     throw new NotImplementedException("zeros_like");
                     // return zeros(shape_internal(tensor, optimize: optimize), dtype: dtype, name: name);
@@ -496,7 +660,7 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <returns></returns>
         public static Tensor stop_gradient(Tensor input, string name = null)
-            => gen_array_ops.stop_gradient(input,  name);
+            => gen_array_ops.stop_gradient(input, name);
 
         /// <summary>
         /// Extracts a strided slice of a tensor (generalized python array indexing).
@@ -512,7 +676,7 @@ namespace Tensorflow
         /// <param name="shrink_axis_mask"></param>
         /// <param name="name"></param>
         /// <returns></returns>
-        public static Tensor strided_slice(Tensor input_, Tensor begin, Tensor end, 
+        public static Tensor strided_slice(Tensor input_, Tensor begin, Tensor end,
             Tensor strides = null,
             int begin_mask = 0,
             int end_mask = 0,
@@ -539,6 +703,51 @@ namespace Tensorflow
         }
 
         /// <summary>
+        /// Returns the gradient of `StridedSlice`.
+        /// 
+        /// Since `StridedSlice` cuts out pieces of its `input` which is size
+        /// `shape`, its gradient will have the same shape (which is passed here
+        /// as `shape`). The gradient will be zero in any element that the slice
+        /// does not select.
+        /// </summary>
+        /// <param name="shape">Must be one of the following types: `int32`, `int64`.</param>
+        /// <param name="begin">Must have the same type as `shape`.</param>
+        /// <param name="end">Must have the same type as `shape`.</param>
+        /// <param name="strides">Must have the same type as `shape`.</param>
+        /// <param name="dy">A `Tensor`.</param>
+        /// <param name="begin_mask">An optional `int`. Defaults to `0`.</param>
+        /// <param name="end_mask">An optional `int`. Defaults to `0`.</param>
+        /// <param name="ellipsis_mask">An optional `int`. Defaults to `0`.</param>
+        /// <param name="new_axis_mask">An optional `int`. Defaults to `0`.</param>
+        /// <param name="shrink_axis_mask">An optional `int`. Defaults to `0`.</param>
+        /// <param name="name">A name for the operation (optional).</param>
+        /// <returns>A `Tensor`. Has the same type as `dy`.</returns>
+        public static Tensor strided_slice_grad(Tensor shape, Tensor begin, Tensor end, Tensor strides, Tensor dy,
+            long begin_mask = 0, long end_mask = 0, long ellipsis_mask = 0, long new_axis_mask = 0,
+            long shrink_axis_mask = 0, string name = null)
+            => tf.Context.ExecuteOp("StridedSliceGrad", name,
+                new ExecuteOpArgs(shape, begin, end, strides, dy)
+                {
+                    GetGradientAttrs = (op) => new
+                    {
+                        T = op.get_attr<TF_DataType>("T"),
+                        Index = op.get_attr<TF_DataType>("Index"),
+                        begin_mask = op.get_attr<long>("begin_mask"),
+                        end_mask = op.get_attr<long>("end_mask"),
+                        ellipsis_mask = op.get_attr<long>("ellipsis_mask"),
+                        new_axis_mask = op.get_attr<long>("new_axis_mask"),
+                        shrink_axis_mask = op.get_attr<long>("shrink_axis_mask")
+                    }
+                }.SetAttributes(new
+                {
+                    begin_mask,
+                    end_mask,
+                    ellipsis_mask,
+                    new_axis_mask,
+                    shrink_axis_mask
+                }));
+
+        /// <summary>
         /// Removes dimensions of size 1 from the shape of a tensor.
         /// Given a tensor `input`, this operation returns a tensor of the same type with
         /// all dimensions of size 1 removed.If you don't want to remove all size 1
@@ -563,6 +772,25 @@ namespace Tensorflow
 
         public static Tensor invert_permutation(Tensor x, string name = null)
             => gen_array_ops.invert_permutation(x, name: name);
+
+        public static Tensor matrix_diag(Tensor diagonal,
+                string name = "diag",
+                int k = 0,
+                int num_rows = -1,
+                int num_cols = -1,
+                float padding_value = 0,
+                string align = "RIGHT_LEFT")
+            => tf.Context.ExecuteOp("MatrixDiagV3", name, 
+                new ExecuteOpArgs(diagonal, k, num_rows, num_cols, padding_value)
+                    .SetAttributes(new { align }));
+
+        public static Tensor matrix_set_diag(Tensor input,
+            Tensor diagonal,
+            string name = "set_diag",
+            int k = 0,
+            string align = "RIGHT_LEFT")
+                => tf.Context.ExecuteOp("MatrixSetDiagV3", name, new ExecuteOpArgs(input, diagonal, k)
+                    .SetAttributes(new { align }));
 
         /// <summary>
         /// Computes the shape of a broadcast given symbolic shapes.
@@ -593,9 +821,10 @@ namespace Tensorflow
         /// <returns></returns>
         public static Tensor concat(Tensor[] values, int axis, string name = "concat")
         {
-            if(values.Length == 1) // Degenerate case of one tensor.
+            if (values.Length == 1) // Degenerate case of one tensor.
             {
-                return tf_with(ops.name_scope(name), scope => {
+                return tf_with(ops.name_scope(name), scope =>
+                {
                     var t = ops.convert_to_tensor(axis, name: "concat_dim", dtype: TF_DataType.TF_INT32);
                     return identity(values[0], name: scope);
                 });
@@ -626,7 +855,22 @@ namespace Tensorflow
             return gen_array_ops.gather_v2(@params, indices, axis, name: name);
         }
 
-        public static Tensor transpose<T1, T2>(T1 a, T2 perm, string name = "transpose", bool conjugate = false)
+        public static Tensor transpose<T1>(T1 a, TensorShape perm, string name = "transpose", bool conjugate = false)
+        {
+            return tf_with(ops.name_scope(name, "transpose", new { a }), scope =>
+            {
+                var a_tensor = ops.convert_to_tensor(a);
+                if (perm == null)
+                {
+                    var rank = a_tensor.rank;
+                    perm = range(0, rank).OrderByDescending(x => x).ToArray();
+                }
+
+                return gen_array_ops.transpose(a_tensor, perm, name: scope);
+            });
+        }
+
+        public static Tensor transpose(Tensor a, Tensor perm, string name = "transpose", bool conjugate = false)
         {
             return tf_with(ops.name_scope(name, "transpose", new { a }), scope =>
             {
@@ -634,18 +878,55 @@ namespace Tensorflow
             });
         }
 
-        public static Tensor[] split(Tensor value, int num_or_size_splits, Tensor axis, 
+        public static Tensor[] split(Tensor value, Tensor size_splits, int axis, int num = -1,
             string name = "split")
         {
-            var size_splits = ops.convert_to_tensor(num_or_size_splits);
-            return gen_array_ops.split(axis: axis,
-                num_split: num_or_size_splits,
-                value: value,
-                name: name);
+            if (num == -1)
+                num = size_splits.shape[0];
+
+            return gen_array_ops.split_v(value, size_splits, axis, num, name: name);
         }
+
+        public static Tensor[] split<T>(Tensor value, int num_split, T axis,
+            string name = "split")
+        {
+            var size_splits = ops.convert_to_tensor(num_split);
+
+            if (tf.Context.executing_eagerly())
+            {
+                return split_eager_fallback(axis, value, num_split: num_split, name: name, ctx: tf.Context);
+            }
+
+            var _op = tf.OpDefLib._apply_op_helper("Split", name, new { split_dim = axis, value, num_split });
+            return _op.outputs;
+        }
+
+        private static Tensor[] split_eager_fallback<Ta, Tv>(Ta axis, Tv value, int num_split, string name, Context ctx = null)
+        {
+            var (_attr_T, input) = tf.Runner.ArgsToMatchingEager(ctx, args: new object[] { value });
+            var axis_tensor = ops.convert_to_tensor(axis, dtype: TF_DataType.TF_INT32);
+            var _inputs_flat = new List<Tensor> { axis_tensor };
+            _inputs_flat.AddRange(input);
+            var _attrs = new object[] { "num_split", num_split, "T", _attr_T };
+
+            return tf.Runner.Execute(ctx, "Split", num_split, _inputs_flat.ToArray(), _attrs, name: name);
+        }
+
+        public static Tensor slice(Tensor input, Tensor[] begin, Tensor[] size, string name = null)
+            => gen_array_ops.slice(input, begin, size, name: name);
 
         public static Tensor slice<Tb, Ts>(Tensor input, Tb begin, Ts size, string name = null)
             => gen_array_ops.slice(input, begin, size, name: name);
+
+        public static Tensor slice(Tensor input, Tensor begin, Tensor size, string name = null)
+            => tf.Context.ExecuteOp("Slice", name, new ExecuteOpArgs(input, begin, size)
+            {
+                GetGradientAttrs = (op) => new
+                {
+                    T = op.get_attr<TF_DataType>("T"),
+                    Index = op.get_attr<int>("Index")
+                }
+            });
 
         public static Tensor stack(object values, int axis = 0, string name = "stack")
         {
@@ -660,7 +941,7 @@ namespace Tensorflow
         {
             Tensor result = null;
             mode = mode.ToUpper();
-            if(mode == "CONSTANT")
+            if (mode == "CONSTANT")
             {
                 if (constant_values != 0)
                     throw new NotImplementedException("gen_array_ops.pad_v2");
@@ -669,30 +950,36 @@ namespace Tensorflow
             }
 
             // Restore shape information where possible.
-            var paddings_constant = tensor_util.constant_value(
-                result.op.inputs[1], partial: true);
-            var input_shape = result.op.inputs[0].TensorShape;
-            if (input_shape.ndim > -1 &&
-                !result.TensorShape.is_fully_defined() &&
-                !(paddings_constant is null))
+            if (!tf.Context.executing_eagerly())
             {
-                var new_shape = new List<int>();
-                foreach((NDArray padding, int dim) in zip(paddings_constant.GetNDArrays(), np.array(input_shape.dims).GetNDArrays()))
+                var paddings_constant = tensor_util.constant_value(paddings);
+                var input_shape = result.op.inputs[0].TensorShape;
+                if (input_shape.ndim > -1 &&
+                    !result.TensorShape.is_fully_defined() &&
+                    !(paddings_constant is null))
                 {
-                    if (padding is null || dim == -1 || padding.GetData<int>().Contains(-1))
-                        new_shape.Add(-1);
-                    else
-                        new_shape.Add(np.sum(padding) + dim);
+                    var new_shape = new List<int>();
+                    foreach ((NDArray padding, int dim) in zip(paddings_constant.GetNDArrays(), np.array(input_shape.dims).GetNDArrays()))
+                    {
+                        if (padding is null || dim == -1 || padding.GetData<int>().Contains(-1))
+                            new_shape.Add(-1);
+                        else
+                            new_shape.Add(np.sum(padding) + dim);
+                    }
+                    result.set_shape(new_shape.ToArray());
                 }
-                result.set_shape(new_shape.ToArray());
             }
 
             return result;
         }
 
-        public static Tensor placeholder(TF_DataType dtype)
+        public static Tensor placeholder(TF_DataType dtype, TensorShape shape = null, string name = null)
         {
-            throw new NotImplementedException("array_ops.placeholder");
+            if (tf.Context.executing_eagerly())
+                throw new RuntimeError("tf.placeholder() is not compatible with eager execution.");
+
+            var _op = tf.OpDefLib._apply_op_helper("Placeholder", name: name, args: new { dtype, shape });
+            return _op.output;
         }
     }
 }

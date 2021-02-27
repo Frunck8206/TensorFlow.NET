@@ -24,29 +24,8 @@ namespace Tensorflow
     /// <summary>
     /// Variable based on resource handles.
     /// </summary>
-    public class ResourceVariable : VariableV1
+    public partial class ResourceVariable : BaseResourceVariable, IVariableV1
     {
-        bool _in_graph_mode;
-        Tensor _handle;
-        TensorShape _shape;
-        public TensorShape shape => _shape;
-        string _handle_name;
-        string _unique_id;
-        Operation _initializer_op;
-        public override Operation initializer => _initializer_op;
-        Tensor _initial_value;
-        bool _trainable;
-        public bool tranable => _trainable;
-        Tensor _cached_value;
-        Tensor _graph_element;
-        public override Tensor graph_element => _graph_element;
-        TF_DataType _dtype;
-        public TF_DataType dtype => _dtype;
-        public override string name => _handle.name;
-        public string Device => _handle.Device;
-        public Graph Graph => _handle.graph;
-        public override Operation op => _handle.op;
-
         public ResourceVariable(object initial_value = null,
             bool trainable = true,
             List<string> collections = null,
@@ -56,13 +35,8 @@ namespace Tensorflow
             VariableDef variable_def = null,
             TF_DataType dtype = TF_DataType.DtInvalid,
             string import_scope = "",
-            TensorShape shape = null) : base(initial_value,
-                    trainable,
-                    collections,
-                    validate_shape,
-                    caching_device,
-                    name,
-                    dtype)
+            VariableAggregation aggregation = VariableAggregation.None,
+            TensorShape shape = null)
         {
             if (variable_def != null)
             {
@@ -72,12 +46,13 @@ namespace Tensorflow
             }
             else
             {
-                _init_from_args(initial_value: initial_value, 
-                    trainable: trainable, 
-                    collections: collections, 
-                    caching_device: caching_device, 
-                    name: name, 
+                _init_from_args(initial_value: initial_value,
+                    trainable: trainable,
+                    collections: collections,
+                    caching_device: caching_device,
+                    name: name,
                     dtype: dtype,
+                    aggregation: aggregation,
                     shape: shape);
             }
         }
@@ -88,81 +63,91 @@ namespace Tensorflow
             string caching_device = "",
             string name = null,
             TF_DataType dtype = TF_DataType.DtInvalid,
+            VariableAggregation aggregation = VariableAggregation.None,
             TensorShape shape = null)
         {
-            var init_from_fn = initial_value.GetType().Name == "Func`1";
-            if(collections == null)
+            var init_from_fn = initial_value.GetType().Name == "Func`1" ||
+                initial_value.GetType().GetInterface("IInitializer") != null;
+            if (collections == null)
                 collections = new List<string>() { tf.GraphKeys.GLOBAL_VARIABLES };
             _trainable = trainable;
-            _graph_key = ops.get_default_graph().graph_key;
 
-            ops.init_scope();
-            _in_graph_mode = true;
-            tf_with(ops.name_scope(name, "Variable"), scope =>
+            if (trainable && !collections.Contains(tf.GraphKeys.TRAINABLE_VARIABLES))
+                collections.Add(tf.GraphKeys.TRAINABLE_VARIABLES);
+
+            tf_with(ops.init_scope(), init_scope =>
             {
-                name = scope;
-                var handle_name = ops.name_from_scope_name(name);
-                var shared_name = handle_name;
-                var unique_id = shared_name;
-
-                var attr = new AttrValue();
-                attr.List = new AttrValue.Types.ListValue();
-                attr.List.S.Add(ByteString.CopyFromUtf8($"loc:{handle_name}"));
-                tf_with(ops.name_scope("Initializer"), delegate
+                _in_graph_mode = !tf.Context.executing_eagerly();
+                tf_with(ops.name_scope(name, "Variable", initial_value, skip_on_eager: false), scope =>
                 {
-                    initial_value = ops.convert_to_tensor(init_from_fn ? (initial_value as Func<Tensor>)() : initial_value,
-                        name: "initial_value",
-                        dtype: dtype);
-                });
-                _shape = shape ?? (initial_value as Tensor).TensorShape;
-                _initial_value = initial_value as Tensor;
-                _handle = resource_variable_ops.eager_safe_variable_handle(
-                      initial_value: _initial_value,
-                      shape: _shape,
-                      shared_name: shared_name,
-                      name: name,
-                      graph_mode: _in_graph_mode);
-                _unique_id = unique_id;
-                _handle_name = handle_name + ":0";
-                _dtype = _initial_value.dtype.as_base_dtype();
-                // _constraint = constraint;
+                    name = scope;
+                    var handle_name = ops.name_from_scope_name(name);
+                    string unique_id = "";
+                    string shared_name = "";
 
-                if (_in_graph_mode)
-                {
-                    tf_with(ops.name_scope("IsInitialized"), delegate
+                    if (_in_graph_mode)
                     {
-                        _is_initialized_op = gen_resource_variable_ops.var_is_initialized_op(_handle);
-                    });
-
-                    if(initial_value != null)
+                        shared_name = handle_name;
+                        unique_id = shared_name;
+                    }
+                    else
                     {
-                        tf_with(ops.name_scope("Assign"), scope1 =>
-                        {
-                            string n = scope1;
-                            _initializer_op = gen_resource_variable_ops.assign_variable_op(_handle, 
-                                variables._try_guard_against_uninitialized_dependencies(name, _initial_value),
-                                name: n);
-                        });
+                        unique_id = $"{handle_name}_{ops.uid()}";
+                        shared_name = tf.Context.shared_name();
                     }
 
-                    // Manually assign reads to the handle's device to avoid log
-                    // messages.
-                    tf_with(ops.name_scope("Read"), delegate
+                    var attr = new AttrValue();
+                    attr.List = new AttrValue.Types.ListValue();
+                    attr.List.S.Add(ByteString.CopyFromUtf8($"loc:@{handle_name}"));
+                    tf_with(ops.name_scope("Initializer"), delegate
                     {
-                        var value = _read_variable_op();
-                        _graph_element = value;
+                        if (initial_value.GetType().GetInterface("IInitializer") != null)
+                            _initial_value = ops.convert_to_tensor((initial_value as IInitializer).Apply(new InitializerArgs(shape, dtype: dtype)));
+                        else
+                        {
+                            var value = init_from_fn ? (initial_value as Func<Tensor>)() : initial_value;
+                            _initial_value = ops.convert_to_tensor(value,
+                                name: "initial_value",
+                                dtype: dtype);
+                        }
                     });
-                }
 
-                ops.add_to_collections(collections, this);
+                    _shape = shape ?? _initial_value.TensorShape;
+
+                    if (_in_graph_mode)
+                    {
+                        handle = state_ops.variable_op_v2(_initial_value.shape, _initial_value.dtype.as_base_dtype(), name: name);
+                        initializer_op = gen_state_ops.assign(handle, _initial_value, true).op;
+
+                        ops.colocate_with(initializer_op);
+
+                        _graph_element = gen_array_ops.identity(handle, name = "read");
+                        ops.add_to_collections<IVariableV1>(collections, this);
+                        _dtype = handle.dtype;
+                    }
+                    else
+                    {
+                        handle = resource_variable_ops.eager_safe_variable_handle(
+                          initial_value: _initial_value,
+                          shape: _shape,
+                          shared_name: shared_name,
+                          name: name,
+                          graph_mode: _in_graph_mode);
+
+                        gen_resource_variable_ops.assign_variable_op(handle, _initial_value);
+                        initializer_op = null;
+                        _graph_element = null;
+                        _dtype = _initial_value.dtype.as_base_dtype();
+                        // initial_value = _in_graph_mode ? initial_value : null;
+                    }
+
+                    base.__init__(trainable: trainable,
+                        handle: handle,
+                        name: name,
+                        unique_id: unique_id,
+                        handle_name: handle_name);
+                });
             });
-        }
-
-        private Tensor _read_variable_op()
-        {
-            var result = gen_resource_variable_ops.read_variable_op(_handle, _dtype);
-            // _maybe_set_handle_data(_dtype, _handle, result);
-            return result;
         }
 
         private void _init_from_proto(VariableDef variable_def, string import_scope = null)
@@ -174,12 +159,13 @@ namespace Tensorflow
             // Create from variable_def.
             var g = ops.get_default_graph();
             var prepend_name_scope = ops.prepend_name_scope(variable_def.VariableName, import_scope: import_scope);
-            _handle = g.as_graph_element(prepend_name_scope) as Tensor;
-            _shape = new TensorShape(_handle.op.get_attr("shape") as TensorShapeProto);
-            _handle_name = _handle.name;
-            _unique_id = _handle_name;
+            handle = g.as_graph_element(prepend_name_scope) as Tensor;
+            _handle_name = handle.name;
+            _name = handle.name;
+            _shape = new TensorShape(handle.op.get_attr("shape") as TensorShapeProto);
+
             prepend_name_scope = ops.prepend_name_scope(variable_def.InitializerName, import_scope: import_scope);
-            _initializer_op = g.as_graph_element(prepend_name_scope) as Operation;
+            initializer_op = g.as_graph_element(prepend_name_scope) as Operation;
             if (!string.IsNullOrEmpty(variable_def.InitialValueName))
             {
                 prepend_name_scope = ops.prepend_name_scope(variable_def.InitialValueName, import_scope: import_scope);
@@ -197,8 +183,6 @@ namespace Tensorflow
             {
                 prepend_name_scope = ops.prepend_name_scope(variable_def.SnapshotName, import_scope: import_scope);
                 var snapshot = g.as_graph_element(prepend_name_scope) as Tensor;
-                if (snapshot.op.type != "ReadVariableOp")
-                    _cached_value = snapshot;
                 while (snapshot.op.type != "ReadVariableOp")
                     snapshot = snapshot.op.inputs[0];
                 _graph_element = snapshot;
@@ -213,7 +197,7 @@ namespace Tensorflow
                 throw new NotImplementedException("SaveSliceInfoDef _init_from_proto");
             }
 
-            _dtype = dtypes.as_tf_dtype((DataType)_handle.op.get_attr("dtype"));
+            _dtype = dtypes.as_tf_dtype((DataType)handle.op.get_attr("dtype"));
         }
 
         public Tensor sparse_read(Tensor indices, string name = "Gather")
@@ -222,15 +206,28 @@ namespace Tensorflow
             {
                 name = scope;
                 var value = gen_resource_variable_ops.resource_gather(
-                    _handle, indices, dtype: _dtype, name: name);
+                    handle, indices, dtype: _dtype, name: name);
 
                 return array_ops.identity(value);
             });
         }
 
-        public override string ToString()
+        public VariableDef to_proto(string export_scope)
         {
-            return $"tf.ResourceVariable '{name}' shape={shape} dtype={dtype}";
+            if (string.IsNullOrEmpty(export_scope) || Handle.name.StartsWith(export_scope))
+            {
+                var var_def = new VariableDef();
+                var_def.VariableName = ops.strip_name_scope(Handle.name, export_scope);
+                if (_initial_value != null)
+                    var_def.InitialValueName = ops.strip_name_scope(_initial_value.name, export_scope);
+                var_def.Trainable = _trainable;
+                var_def.InitializerName = ops.strip_name_scope(initializer.name, export_scope);
+                var_def.SnapshotName = ops.strip_name_scope(_graph_element.name, export_scope);
+
+                return var_def;
+            }
+
+            throw new NotImplementedException("to_proto RefVariable");
         }
     }
 }

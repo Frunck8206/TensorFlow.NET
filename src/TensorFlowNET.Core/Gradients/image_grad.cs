@@ -15,11 +15,7 @@
 ******************************************************************************/
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using Tensorflow.Framework;
-using static Tensorflow.Binding;
 
 namespace Tensorflow.Gradients
 {
@@ -34,7 +30,7 @@ namespace Tensorflow.Gradients
             var shape = new TensorShape(image.shape.Skip(1).Take(2).ToArray());
             Tensor image_shape = null;
             if (shape.is_fully_defined())
-                throw new NotImplementedException("_ResizeNearestNeighborGrad shape.is_fully_defined");
+                image_shape = constant_op.constant(image.shape.Skip(1).Take(2).ToArray());
             else
                 image_shape = array_ops.shape(image)["1:3"];
 

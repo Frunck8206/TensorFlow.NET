@@ -30,10 +30,10 @@ namespace Tensorflow.Train
         /// <param name="name"></param>
         /// <param name="colocate_with_primary"></param>
         /// <returns></returns>
-        public RefVariable create_slot(RefVariable primary, Tensor val, string name, bool colocate_with_primary = true)
+        public IVariableV1 create_slot(RefVariable primary, Tensor val, string name, bool colocate_with_primary = true)
         {
             var validate_shape = val.TensorShape.is_fully_defined();
-            var prefix = primary.op.name;
+            var prefix = primary.Op.name;
             return tf_with(tf.variable_scope(name: null, prefix + "/" + name), delegate
             {
                 return _create_slot_var(primary, val, "", validate_shape, null, TF_DataType.DtInvalid);
@@ -48,7 +48,7 @@ namespace Tensorflow.Train
         /// <param name="dtype"></param>
         /// <param name="colocate_with_primary"></param>
         /// <returns></returns>
-        public RefVariable create_zeros_slot(RefVariable primary, string name, TF_DataType dtype = TF_DataType.DtInvalid, bool colocate_with_primary = true)
+        public IVariableV1 create_zeros_slot(IVariableV1 primary, string name, TF_DataType dtype = TF_DataType.DtInvalid, bool colocate_with_primary = true)
         {
             if (dtype == TF_DataType.DtInvalid)
                 dtype = primary.dtype;
@@ -70,11 +70,11 @@ namespace Tensorflow.Train
         /// Creates a slot initialized using an `Initializer`.
         /// </summary>
         /// <returns></returns>
-        public RefVariable create_slot_with_initializer(RefVariable primary, IInitializer initializer, TensorShape shape, 
+        public IVariableV1 create_slot_with_initializer(IVariableV1 primary, IInitializer initializer, TensorShape shape,
             TF_DataType dtype, string name, bool colocate_with_primary = true)
         {
             var validate_shape = shape.is_fully_defined();
-            var prefix = primary.op.name;
+            var prefix = primary.Op.name;
             return tf_with(new variable_scope(string.Empty, prefix + "/" + name), delegate
             {
                 return _create_slot_var(primary, initializer, "", validate_shape, shape, dtype);
@@ -91,14 +91,14 @@ namespace Tensorflow.Train
         /// <param name="shape"></param>
         /// <param name="dtype"></param>
         /// <returns></returns>
-        private RefVariable _create_slot_var(VariableV1 primary, object val, string scope, bool validate_shape, 
+        private IVariableV1 _create_slot_var(IVariableV1 primary, object val, string scope, bool validate_shape,
             TensorShape shape, TF_DataType dtype)
         {
             bool use_resource = primary is ResourceVariable;
             if (resource_variable_ops.is_resource_variable(primary))
                 use_resource = true;
 
-            var slot = tf.get_variable(
+            var slot = tf.compat.v1.get_variable(
               scope,
               initializer: val,
               trainable: false,

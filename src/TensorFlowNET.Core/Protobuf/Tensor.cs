@@ -42,14 +42,15 @@ namespace Tensorflow {
             "X3ZhbBgQIAMoDUICEAESFgoKdWludDY0X3ZhbBgRIAMoBEICEAEiZwoWVmFy",
             "aWFudFRlbnNvckRhdGFQcm90bxIRCgl0eXBlX25hbWUYASABKAkSEAoIbWV0",
             "YWRhdGEYAiABKAwSKAoHdGVuc29ycxgDIAMoCzIXLnRlbnNvcmZsb3cuVGVu",
-            "c29yUHJvdG9CbAoYb3JnLnRlbnNvcmZsb3cuZnJhbWV3b3JrQgxUZW5zb3JQ",
-            "cm90b3NQAVo9Z2l0aHViLmNvbS90ZW5zb3JmbG93L3RlbnNvcmZsb3cvdGVu",
-            "c29yZmxvdy9nby9jb3JlL2ZyYW1ld29ya/gBAWIGcHJvdG8z"));
+            "c29yUHJvdG9CfAoYb3JnLnRlbnNvcmZsb3cuZnJhbWV3b3JrQgxUZW5zb3JQ",
+            "cm90b3NQAVpNZ2l0aHViLmNvbS90ZW5zb3JmbG93L3RlbnNvcmZsb3cvdGVu",
+            "c29yZmxvdy9nby9jb3JlL2ZyYW1ld29yay90ZW5zb3JfZ29fcHJvdG/4AQFi",
+            "BnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Tensorflow.ResourceHandleReflection.Descriptor, global::Tensorflow.TensorShapeReflection.Descriptor, global::Tensorflow.TypesReflection.Descriptor, },
-          new pbr::GeneratedClrTypeInfo(null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.TensorProto), global::Tensorflow.TensorProto.Parser, new[]{ "Dtype", "TensorShape", "VersionNumber", "TensorContent", "HalfVal", "FloatVal", "DoubleVal", "IntVal", "StringVal", "ScomplexVal", "Int64Val", "BoolVal", "DcomplexVal", "ResourceHandleVal", "VariantVal", "Uint32Val", "Uint64Val" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.VariantTensorDataProto), global::Tensorflow.VariantTensorDataProto.Parser, new[]{ "TypeName", "Metadata", "Tensors" }, null, null, null)
+          new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.TensorProto), global::Tensorflow.TensorProto.Parser, new[]{ "Dtype", "TensorShape", "VersionNumber", "TensorContent", "HalfVal", "FloatVal", "DoubleVal", "IntVal", "StringVal", "ScomplexVal", "Int64Val", "BoolVal", "DcomplexVal", "ResourceHandleVal", "VariantVal", "Uint32Val", "Uint64Val" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.VariantTensorDataProto), global::Tensorflow.VariantTensorDataProto.Parser, new[]{ "TypeName", "Metadata", "Tensors" }, null, null, null, null)
           }));
     }
     #endregion
@@ -111,7 +112,7 @@ namespace Tensorflow {
 
     /// <summary>Field number for the "dtype" field.</summary>
     public const int DtypeFieldNumber = 1;
-    private global::Tensorflow.DataType dtype_ = 0;
+    private global::Tensorflow.DataType dtype_ = global::Tensorflow.DataType.DtInvalid;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public global::Tensorflow.DataType Dtype {
       get { return dtype_; }
@@ -378,7 +379,7 @@ namespace Tensorflow {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public override int GetHashCode() {
       int hash = 1;
-      if (Dtype != 0) hash ^= Dtype.GetHashCode();
+      if (Dtype != global::Tensorflow.DataType.DtInvalid) hash ^= Dtype.GetHashCode();
       if (tensorShape_ != null) hash ^= TensorShape.GetHashCode();
       if (VersionNumber != 0) hash ^= VersionNumber.GetHashCode();
       if (TensorContent.Length != 0) hash ^= TensorContent.GetHashCode();
@@ -408,7 +409,7 @@ namespace Tensorflow {
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public void WriteTo(pb::CodedOutputStream output) {
-      if (Dtype != 0) {
+      if (Dtype != global::Tensorflow.DataType.DtInvalid) {
         output.WriteRawTag(8);
         output.WriteEnum((int) Dtype);
       }
@@ -445,7 +446,7 @@ namespace Tensorflow {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public int CalculateSize() {
       int size = 0;
-      if (Dtype != 0) {
+      if (Dtype != global::Tensorflow.DataType.DtInvalid) {
         size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) Dtype);
       }
       if (tensorShape_ != null) {
@@ -481,12 +482,12 @@ namespace Tensorflow {
       if (other == null) {
         return;
       }
-      if (other.Dtype != 0) {
+      if (other.Dtype != global::Tensorflow.DataType.DtInvalid) {
         Dtype = other.Dtype;
       }
       if (other.tensorShape_ != null) {
         if (tensorShape_ == null) {
-          tensorShape_ = new global::Tensorflow.TensorShapeProto();
+          TensorShape = new global::Tensorflow.TensorShapeProto();
         }
         TensorShape.MergeFrom(other.TensorShape);
       }
@@ -521,14 +522,14 @@ namespace Tensorflow {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
           case 8: {
-            dtype_ = (global::Tensorflow.DataType) input.ReadEnum();
+            Dtype = (global::Tensorflow.DataType) input.ReadEnum();
             break;
           }
           case 18: {
             if (tensorShape_ == null) {
-              tensorShape_ = new global::Tensorflow.TensorShapeProto();
+              TensorShape = new global::Tensorflow.TensorShapeProto();
             }
-            input.ReadMessage(tensorShape_);
+            input.ReadMessage(TensorShape);
             break;
           }
           case 24: {

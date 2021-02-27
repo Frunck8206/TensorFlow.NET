@@ -16,7 +16,6 @@
 
 using System;
 using Tensorflow.Keras.Engine;
-using Tensorflow.Operations;
 using static Tensorflow.Binding;
 
 namespace Tensorflow
@@ -28,21 +27,21 @@ namespace Tensorflow
 
         public override object state_size => _num_units;
         public override int output_size => _num_units;
-        public VariableV1 _kernel;
+        public IVariableV1 _kernel;
         string _WEIGHTS_VARIABLE_NAME = "kernel";
-        public VariableV1 _bias;
+        public IVariableV1 _bias;
         string _BIAS_VARIABLE_NAME = "bias";
 
         public BasicRnnCell(int num_units,
             Func<Tensor, string, Tensor> activation = null,
             bool? reuse = null,
             string name = null,
-            TF_DataType dtype = TF_DataType.DtInvalid) : base(_reuse: reuse, 
-                name: name, 
+            TF_DataType dtype = TF_DataType.DtInvalid) : base(_reuse: reuse,
+                name: name,
                 dtype: dtype)
         {
             // Inputs must be 2-dimensional.
-            input_spec = new InputSpec(ndim: 2);
+            inputSpec = new InputSpec(ndim: 2);
 
             _num_units = num_units;
             if (activation == null)
@@ -67,14 +66,14 @@ namespace Tensorflow
             built = true;
         }
 
-        protected override Tensor[] call(Tensor inputs, Tensor training = null, Tensor state = null)
+        protected Tensors Call(Tensors inputs, Tensor state = null, bool is_training = false)
         {
             // Most basic RNN: output = new_state = act(W * input + U * state + B).
-            var concat = array_ops.concat(new[] { inputs, state }, 1);
-            var gate_inputs = math_ops.matmul(concat, _kernel as RefVariable);
-            gate_inputs = nn_ops.bias_add(gate_inputs, _bias as RefVariable);
+            var concat = array_ops.concat(new Tensor[] { inputs, state }, 1);
+            var gate_inputs = math_ops.matmul(concat, _kernel.AsTensor());
+            gate_inputs = nn_ops.bias_add(gate_inputs, _bias);
             var output = _activation(gate_inputs, null);
-            return new[] { output, output };
+            return new Tensors(output, output);
         }
     }
 }

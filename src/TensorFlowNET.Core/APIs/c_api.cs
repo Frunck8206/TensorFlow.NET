@@ -1,5 +1,5 @@
 ﻿/*****************************************************************************
-   Copyright 2018 The TensorFlow.NET Authors. All Rights Reserved.
+   Copyright 2020 Haiping Chen. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -50,7 +50,11 @@ namespace Tensorflow
             return handle == IntPtr.Zero ? String.Empty : Marshal.PtrToStringAnsi(handle);
         }
 
+        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
         public delegate void Deallocator(IntPtr data, IntPtr size, ref DeallocatorArgs args);
+
+        [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+        public delegate void DeallocatorV2(IntPtr data, long size, IntPtr args);
 
         public struct DeallocatorArgs
         {
@@ -59,8 +63,8 @@ namespace Tensorflow
 
             static unsafe DeallocatorArgs()
             {
-                Empty = new IntPtr(EmptyPtr = (DeallocatorArgs*) Marshal.AllocHGlobal(Marshal.SizeOf<DeallocatorArgs>()));
-                *EmptyPtr = new DeallocatorArgs() {gc_handle = IntPtr.Zero, deallocator_called = false};
+                Empty = new IntPtr(EmptyPtr = (DeallocatorArgs*)Marshal.AllocHGlobal(Marshal.SizeOf<DeallocatorArgs>()));
+                *EmptyPtr = new DeallocatorArgs() { gc_handle = IntPtr.Zero, deallocator_called = false };
             }
 
             public bool deallocator_called;
@@ -68,6 +72,6 @@ namespace Tensorflow
         }
 
         [DllImport(TensorFlowLibName)]
-        public static extern IntPtr TF_Version();
+        internal static extern IntPtr TF_Version();
     }
 }

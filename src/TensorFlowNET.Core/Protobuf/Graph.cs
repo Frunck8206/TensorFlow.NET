@@ -25,20 +25,20 @@ namespace Tensorflow {
       byte[] descriptorData = global::System.Convert.FromBase64String(
           string.Concat(
             "CiV0ZW5zb3JmbG93L2NvcmUvZnJhbWV3b3JrL2dyYXBoLnByb3RvEgp0ZW5z",
-            "b3JmbG93Gih0ZW5zb3JmbG93L2NvcmUvZnJhbWV3b3JrL25vZGVfZGVmLnBy",
-            "b3RvGih0ZW5zb3JmbG93L2NvcmUvZnJhbWV3b3JrL2Z1bmN0aW9uLnByb3Rv",
+            "b3JmbG93Gih0ZW5zb3JmbG93L2NvcmUvZnJhbWV3b3JrL2Z1bmN0aW9uLnBy",
+            "b3RvGih0ZW5zb3JmbG93L2NvcmUvZnJhbWV3b3JrL25vZGVfZGVmLnByb3Rv",
             "Gih0ZW5zb3JmbG93L2NvcmUvZnJhbWV3b3JrL3ZlcnNpb25zLnByb3RvIp0B",
             "CghHcmFwaERlZhIhCgRub2RlGAEgAygLMhMudGVuc29yZmxvdy5Ob2RlRGVm",
             "EigKCHZlcnNpb25zGAQgASgLMhYudGVuc29yZmxvdy5WZXJzaW9uRGVmEhMK",
             "B3ZlcnNpb24YAyABKAVCAhgBEi8KB2xpYnJhcnkYAiABKAsyHi50ZW5zb3Jm",
-            "bG93LkZ1bmN0aW9uRGVmTGlicmFyeUJrChhvcmcudGVuc29yZmxvdy5mcmFt",
-            "ZXdvcmtCC0dyYXBoUHJvdG9zUAFaPWdpdGh1Yi5jb20vdGVuc29yZmxvdy90",
-            "ZW5zb3JmbG93L3RlbnNvcmZsb3cvZ28vY29yZS9mcmFtZXdvcmv4AQFiBnBy",
-            "b3RvMw=="));
+            "bG93LkZ1bmN0aW9uRGVmTGlicmFyeUJ6ChhvcmcudGVuc29yZmxvdy5mcmFt",
+            "ZXdvcmtCC0dyYXBoUHJvdG9zUAFaTGdpdGh1Yi5jb20vdGVuc29yZmxvdy90",
+            "ZW5zb3JmbG93L3RlbnNvcmZsb3cvZ28vY29yZS9mcmFtZXdvcmsvZ3JhcGhf",
+            "Z29fcHJvdG/4AQFiBnByb3RvMw=="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
-          new pbr::FileDescriptor[] { global::Tensorflow.NodeDefReflection.Descriptor, global::Tensorflow.FunctionReflection.Descriptor, global::Tensorflow.VersionsReflection.Descriptor, },
-          new pbr::GeneratedClrTypeInfo(null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.GraphDef), global::Tensorflow.GraphDef.Parser, new[]{ "Node", "Versions", "Version", "Library" }, null, null, null)
+          new pbr::FileDescriptor[] { global::Tensorflow.FunctionReflection.Descriptor, global::Tensorflow.NodeDefReflection.Descriptor, global::Tensorflow.VersionsReflection.Descriptor, },
+          new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.GraphDef), global::Tensorflow.GraphDef.Parser, new[]{ "Node", "Versions", "Version", "Library" }, null, null, null, null)
           }));
     }
     #endregion
@@ -253,7 +253,7 @@ namespace Tensorflow {
       node_.Add(other.node_);
       if (other.versions_ != null) {
         if (versions_ == null) {
-          versions_ = new global::Tensorflow.VersionDef();
+          Versions = new global::Tensorflow.VersionDef();
         }
         Versions.MergeFrom(other.Versions);
       }
@@ -262,7 +262,7 @@ namespace Tensorflow {
       }
       if (other.library_ != null) {
         if (library_ == null) {
-          library_ = new global::Tensorflow.FunctionDefLibrary();
+          Library = new global::Tensorflow.FunctionDefLibrary();
         }
         Library.MergeFrom(other.Library);
       }
@@ -283,9 +283,9 @@ namespace Tensorflow {
           }
           case 18: {
             if (library_ == null) {
-              library_ = new global::Tensorflow.FunctionDefLibrary();
+              Library = new global::Tensorflow.FunctionDefLibrary();
             }
-            input.ReadMessage(library_);
+            input.ReadMessage(Library);
             break;
           }
           case 24: {
@@ -294,9 +294,9 @@ namespace Tensorflow {
           }
           case 34: {
             if (versions_ == null) {
-              versions_ = new global::Tensorflow.VersionDef();
+              Versions = new global::Tensorflow.VersionDef();
             }
-            input.ReadMessage(versions_);
+            input.ReadMessage(Versions);
             break;
           }
         }

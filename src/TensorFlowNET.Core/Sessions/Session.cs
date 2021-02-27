@@ -18,11 +18,10 @@ using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 using Tensorflow.Util;
-using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
-    public class Session : BaseSession, IObjectLife
+    public class Session : BaseSession, ITensorFlowObject
     {
         public Session(string target = "", Graph g = null) : base(target, g, null)
         { }
@@ -46,35 +45,35 @@ namespace Tensorflow
             lock (Locks.ProcessWide)
             {
                 var graph = c_api.TF_NewGraph();
-                var status = new Status();
+                using var status = new Status();
                 var opt = new SessionOptions();
 
-                var tags = new string[] {"serve"};
+                var tags = new string[] { "serve" };
                 var buffer = new TF_Buffer();
 
                 IntPtr sess;
                 try
                 {
-                    sess = c_api.TF_LoadSessionFromSavedModel(opt,
+                    sess = c_api.TF_LoadSessionFromSavedModel(opt.Handle,
                         IntPtr.Zero,
                         path,
                         tags,
                         tags.Length,
                         graph,
                         ref buffer,
-                        status);
+                        status.Handle);
                     status.Check(true);
-                } catch (TensorflowException ex) when (ex.Message.Contains("Could not find SavedModel"))
+                }
+                catch (TensorflowException ex) when (ex.Message.Contains("Could not find SavedModel"))
                 {
-                    status = new Status();
-                    sess = c_api.TF_LoadSessionFromSavedModel(opt,
+                    sess = c_api.TF_LoadSessionFromSavedModel(opt.Handle,
                         IntPtr.Zero,
                         Path.GetFullPath(path),
                         tags,
                         tags.Length,
                         graph,
                         ref buffer,
-                        status);
+                        status.Handle);
                     status.Check(true);
                 }
 
@@ -102,12 +101,12 @@ namespace Tensorflow
 
         public void __init__()
         {
-            
+
         }
 
         public void __del__()
         {
-            
+
         }
     }
 }

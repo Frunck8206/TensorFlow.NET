@@ -17,7 +17,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Tensorflow.Operations;
 using static Tensorflow.Binding;
 
 namespace Tensorflow
@@ -37,7 +36,7 @@ namespace Tensorflow
         /// <param name="filename_tensor"></param>
         /// <param name="saveables"></param>
         /// <returns></returns>
-        public virtual Operation save_op(Tensor filename_tensor, SaveableObject[] saveables)
+        public virtual Operation save_op(Tensor filename_tensor, MySaveableObject[] saveables)
         {
             var tensor_names = new List<string>();
             var tensors = new List<Tensor>();
@@ -45,7 +44,7 @@ namespace Tensorflow
 
             foreach (var saveable in saveables)
             {
-                foreach(var spec in saveable.specs)
+                foreach (var spec in saveable.specs)
                 {
                     tensor_names.Add(spec.name);
                     tensors.Add(spec.tensor);
@@ -55,7 +54,7 @@ namespace Tensorflow
 
             if (_write_version == SaverDef.Types.CheckpointFormatVersion.V2)
             {
-                return gen_io_ops.save_v2(filename_tensor, tensor_names.ToArray(), tensor_slices.ToArray(), tensors.ToArray());
+                return tf.io.save_v2(filename_tensor, tensor_names.ToArray(), tensor_slices.ToArray(), tensors.ToArray());
             }
             else
             {
@@ -63,7 +62,7 @@ namespace Tensorflow
             }
         }
 
-        public virtual Tensor[] bulk_restore(Tensor filename_tensor, SaveableObject[] saveables, int preferred_shard, bool restore_sequentially)
+        public virtual Tensor[] bulk_restore(Tensor filename_tensor, MySaveableObject[] saveables, int preferred_shard, bool restore_sequentially)
         {
             var names = new List<string>();
             var slices = new List<string>();
@@ -76,10 +75,10 @@ namespace Tensorflow
                     dtypes.Add(spec.dtype);
                 }
 
-            return gen_io_ops.restore_v2(filename_tensor, names.ToArray(), slices.ToArray(), dtypes.ToArray());
+            return tf.io.restore_v2(filename_tensor, names.ToArray(), slices.ToArray(), dtypes.ToArray());
         }
 
-        public virtual SaverDef _build_internal(VariableV1[] names_to_saveables,
+        public virtual SaverDef _build_internal(IVariableV1[] names_to_saveables,
             bool reshape = false,
             bool sharded = false,
             int max_to_keep = 5,
@@ -166,7 +165,7 @@ namespace Tensorflow
                         default:
                             throw new NotImplementedException("_build_internal.check_collection_list");
                     }*/
-                    
+
                 }
 
                 return new SaverDef()
@@ -182,7 +181,7 @@ namespace Tensorflow
             });
         }
 
-        public Tensor _AddSaveOps(Tensor filename_tensor, SaveableObject[] saveables)
+        public Tensor _AddSaveOps(Tensor filename_tensor, MySaveableObject[] saveables)
         {
             var save = save_op(filename_tensor, saveables);
             return control_flow_ops.with_dependencies(new Operation[] { save }, filename_tensor);
@@ -198,8 +197,8 @@ namespace Tensorflow
         /// <param name="preferred_shard"></param>
         /// <param name="name"></param>
         /// <returns>An Operation that restores the variables.</returns>
-        public Operation _AddRestoreOps(Tensor filename_tensor, 
-            SaveableObject[] saveables,
+        public Operation _AddRestoreOps(Tensor filename_tensor,
+            MySaveableObject[] saveables,
             bool restore_sequentially,
             bool reshape,
             int preferred_shard = -1,
@@ -224,7 +223,7 @@ namespace Tensorflow
                 var saveable_tensors = all_tensors.Skip(idx).Take(saveable.specs.Length);
                 idx += saveable.specs.Length;
                 var restored = saveable.restore(saveable_tensors.ToArray(), shapes == null ? null : shapes.ToArray());
-                assign_ops.Add(restored as ITensorOrOperation);
+                assign_ops.Add(restored);
             }
 
             return control_flow_ops.group(assign_ops.ToArray(), name: name);

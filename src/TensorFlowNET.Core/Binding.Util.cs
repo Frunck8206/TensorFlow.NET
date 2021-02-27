@@ -15,13 +15,14 @@
 ******************************************************************************/
 
 using NumSharp;
+using NumSharp.Utilities;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
-using NumSharp.Utilities;
 
 namespace Tensorflow
 {
@@ -31,15 +32,55 @@ namespace Tensorflow
     public static partial class Binding
     {
         public static T2 get<T1, T2>(this Dictionary<T1, T2> dict, T1 key)
-            => key == null ? 
-                default(T2) : 
-            (dict.ContainsKey(key) ? dict[key] : default(T2));
+            => key == null ?
+                default :
+            (dict.ContainsKey(key) ? dict[key] : default);
+
+        public static void Update<T>(this IList<T> list, T element)
+        {
+            var index = list.IndexOf(element);
+            if (index < 0)
+                list.Add(element);
+            else
+            {
+                list[index] = element;
+            }
+        }
+
+        public static void difference_update<T>(this IList<T> list, IList<T> list2)
+        {
+            foreach(var el in list2)
+            {
+                if (list.Contains(el))
+                    list.Remove(el);
+            }
+        }
 
         public static void add<T>(this IList<T> list, T element)
             => list.Add(element);
 
+        public static void add<T>(this IList<T> list, IEnumerable<T> elements)
+        {
+            foreach (var ele in elements)
+                list.Add(ele);
+        }
+
         public static void append<T>(this IList<T> list, T element)
-            => list.Add(element);
+            => list.Insert(list.Count, element);
+
+        public static void append<T>(this IList<T> list, IList<T> elements)
+        {
+            for (int i = 0; i < elements.Count(); i++)
+                list.Insert(list.Count, elements[i]);
+        }
+
+        public static T[] concat<T>(this IList<T> list1, IList<T> list2)
+        {
+            var list = new List<T>();
+            list.AddRange(list1);
+            list.AddRange(list2);
+            return list.ToArray();
+        }
 
         public static void extend<T>(this List<T> list, IEnumerable<T> elements)
             => list.AddRange(elements);
@@ -51,7 +92,7 @@ namespace Tensorflow
                 case NDArray nd:
                     return nd.ToString(false);
                 case Array arr:
-                    if (arr.Rank!=1 || arr.GetType().GetElementType()?.IsArray == true)
+                    if (arr.Rank != 1 || arr.GetType().GetElementType()?.IsArray == true)
                         arr = Arrays.Flatten(arr);
                     var objs = toObjectArray(arr);
                     return $"[{string.Join(", ", objs.Select(_tostring))}]";
@@ -72,15 +113,50 @@ namespace Tensorflow
             }
         }
 
+        private static TextWriter writer = null;
+
+        public static TextWriter tf_output_redirect { 
+            set
+            {
+                var originWriter = writer ?? Console.Out;
+                originWriter.Flush();
+                if (originWriter is StringWriter)
+                    (originWriter as StringWriter).GetStringBuilder().Clear();
+                writer = value;
+            }
+            get
+            {
+                return writer ?? Console.Out;
+            }
+        }
+
         public static void print(object obj)
         {
-            Console.WriteLine(_tostring(obj));
+            tf_output_redirect.WriteLine(_tostring(obj));
+        }
+
+        public static void print(string format, params object[] objects)
+        {
+            if (!format.Contains("{}"))
+            {
+                tf_output_redirect.WriteLine(format + " " + string.Join(" ", objects.Select(x => x.ToString())));
+                return;
+            }
+
+            foreach (var obj in objects)
+            {
+
+            }
+
+            tf_output_redirect.WriteLine(format);
         }
 
         public static int len(object a)
         {
             switch (a)
             {
+                case Tensors arr:
+                    return arr.Length;
                 case Array arr:
                     return arr.Length;
                 case IList arr:
@@ -91,12 +167,17 @@ namespace Tensorflow
                     return ndArray.ndim == 0 ? 1 : ndArray.shape[0];
                 case IEnumerable enumerable:
                     return enumerable.OfType<object>().Count();
+                case TensorShape arr:
+                    return arr.ndim;
             }
             throw new NotImplementedException("len() not implemented for type: " + a.GetType());
         }
 
         public static float min(float a, float b)
             => Math.Min(a, b);
+
+        public static int max(int a, int b)
+            => Math.Max(a, b);
 
         public static T[] list<T>(IEnumerable<T> list)
             => list.ToArray();
@@ -111,7 +192,14 @@ namespace Tensorflow
             return Enumerable.Range(start, end - start);
         }
 
-        public static T New<T>() where T : IObjectLife, new()
+        public static IEnumerable<T> reversed<T>(IList<T> values)
+        {
+            var len = values.Count;
+            for (int i = len - 1; i >= 0; i--)
+                yield return values[i];
+        }
+
+        public static T New<T>() where T : ITensorFlowObject, new()
         {
             var instance = new T();
             instance.__init__();
@@ -119,8 +207,7 @@ namespace Tensorflow
         }
 
         [DebuggerStepThrough]
-        [DebuggerNonUserCode()] // with "Just My Code" enabled this lets the debugger break at the origin of the exception
-        public static void tf_with(IObjectLife py, Action<IObjectLife> action)
+        public static void tf_with(ITensorFlowObject py, Action<ITensorFlowObject> action)
         {
             try
             {
@@ -135,8 +222,7 @@ namespace Tensorflow
         }
 
         [DebuggerStepThrough]
-        [DebuggerNonUserCode()] // with "Just My Code" enabled this lets the debugger break at the origin of the exception
-        public static void tf_with<T>(T py, Action<T> action) where T : IObjectLife
+        public static void tf_with<T>(T py, Action<T> action) where T : ITensorFlowObject
         {
             try
             {
@@ -151,8 +237,7 @@ namespace Tensorflow
         }
 
         [DebuggerStepThrough]
-        [DebuggerNonUserCode()] // with "Just My Code" enabled this lets the debugger break at the origin of the exception
-        public static TOut tf_with<TIn, TOut>(TIn py, Func<TIn, TOut> action) where TIn : IObjectLife
+        public static TOut tf_with<TIn, TOut>(TIn py, Func<TIn, TOut> action) where TIn : ITensorFlowObject
         {
             try
             {
@@ -169,6 +254,17 @@ namespace Tensorflow
         public static float time()
         {
             return (float)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
+        }
+
+        public static IEnumerable<(T1, T2)> zip<T1, T2>((T1, T1) t1, (T2, T2) t2)
+        {
+            for (int i = 0; i < 2; i++)
+            {
+                if (i == 0)
+                    yield return (t1.Item1, t2.Item1);
+                else
+                    yield return (t1.Item2, t2.Item2);
+            }
         }
 
         public static IEnumerable<(T, T)> zip<T>(NDArray t1, NDArray t2)
@@ -192,13 +288,13 @@ namespace Tensorflow
                 yield return (t1[i], t2[i], t3[i]);
         }
 
-        public static IEnumerable<(T1, T2)> zip<T1, T2>(NDArray t1, NDArray t2) 
-            where T1: unmanaged
-            where T2: unmanaged
+        public static IEnumerable<(T1, T2)> zip<T1, T2>(NDArray t1, NDArray t2)
+            where T1 : unmanaged
+            where T2 : unmanaged
         {
             var a = t1.AsIterator<T1>();
             var b = t2.AsIterator<T2>();
-            while(a.HasNext() && b.HasNext())
+            while (a.HasNext() && b.HasNext())
                 yield return (a.MoveNext(), b.MoveNext());
         }
 
@@ -228,6 +324,18 @@ namespace Tensorflow
             var len = values.Count;
             for (int i = 0; i < len; i++)
                 yield return (i, values[i]);
+        }
+        
+        public static IEnumerable<(int, T)> enumerate<T>(IEnumerable<T> values, int start = 0, int step = 1)
+        {
+            int i = 0;
+            foreach (var val in values)
+            {
+                if (i++ < start)
+                    continue;
+
+                yield return (i - 1, val);
+            }
         }
 
         [DebuggerStepThrough]
@@ -331,7 +439,8 @@ namespace Tensorflow
                 {
                     yield return flds[i].GetValue(tuple);
                 }
-            } else
+            }
+            else
             {
                 throw new System.Exception("Expected Tuple.");
             }
@@ -345,9 +454,50 @@ namespace Tensorflow
         public static bool isinstance(object Item1, object tuple)
         {
             foreach (var t in TupleToEnumerable(tuple))
-                if (isinstance(Item1, (Type) t))
+                if (isinstance(Item1, (Type)t))
                     return true;
             return false;
+        }
+
+        public static bool issubset<T>(this IEnumerable<T> subset, IEnumerable<T> src)
+        {
+            bool issubset = true;
+            foreach (var element in subset)
+            {
+                if (!src.Contains(element))
+                {
+                    issubset = false;
+                    continue;
+                }
+            }
+
+            return true;
+        }
+
+        public static void extendleft<T>(this Queue<T> queue, IEnumerable<T> elements)
+        {
+            foreach (var element in elements.Reverse())
+                queue.Enqueue(element);
+        }
+
+        public static bool empty<T>(this Queue<T> queue)
+            => queue.Count == 0;
+
+        public static TValue SetDefault<TKey, TValue>(this Dictionary<TKey, TValue> dic, TKey key, TValue defaultValue)
+        {
+            if (dic.ContainsKey(key))
+                return dic[key];
+
+            dic[key] = defaultValue;
+            return defaultValue;
+        }
+
+        public static TValue Get<TKey, TValue>(this Dictionary<TKey, TValue> dic, TKey key, TValue defaultValue)
+        {
+            if (dic.ContainsKey(key))
+                return dic[key];
+
+            return defaultValue;
         }
     }
 }

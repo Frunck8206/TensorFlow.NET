@@ -15,19 +15,24 @@
 ******************************************************************************/
 
 using System.Collections.Generic;
+using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
     public class gen_logging_ops
     {
-        public static OpDefLibrary _op_def_lib = new OpDefLibrary();
-
-        public static Operation _assert(Tensor condition, object[] data, int? summarize = 3, string name = null)
+        public static Operation assert(Tensor condition, object[] data, long summarize = 3, string name = null)
         {
-            if (!summarize.HasValue)
-                summarize = 3;
+            if (tf.Context.executing_eagerly())
+            {
+                var results = tf.Runner.TFE_FastPathExecute(new FastPathOpExecInfo(
+                    "Assert", name,
+                    new object[] { condition, data, summarize }));
 
-            var _op = _op_def_lib._apply_op_helper("Assert", name, args: new { condition, data, summarize });
+                return results[0];
+            }
+
+            var _op = tf.OpDefLib._apply_op_helper("Assert", name, args: new { condition, data, summarize });
 
             return _op;
         }
@@ -35,7 +40,7 @@ namespace Tensorflow
         public static Tensor histogram_summary(string tag, Tensor values, string name = null)
         {
             var dict = new Dictionary<string, object>();
-            var op = _op_def_lib._apply_op_helper("HistogramSummary", name: name, args: new { tag, values });
+            var op = tf.OpDefLib._apply_op_helper("HistogramSummary", name: name, args: new { tag, values });
             return op.output;
         }
 
@@ -46,7 +51,7 @@ namespace Tensorflow
         ///    Tags for the summary.
         /// </param>
         /// <param name="values">
-        ///    Same shape as <c>tags.  Values for the summary.
+        ///    Same shape as <c>tags</c>.  Values for the summary.
         /// </param>
         /// <param name="name">
         /// If specified, the created operation in the graph will be this one, otherwise it will be named 'ScalarSummary'.
@@ -64,7 +69,7 @@ namespace Tensorflow
             var dict = new Dictionary<string, object>();
             dict["tags"] = tags;
             dict["values"] = values;
-            var op = _op_def_lib._apply_op_helper("ScalarSummary", name: name, keywords: dict);
+            var op = tf.OpDefLib._apply_op_helper("ScalarSummary", name: name, keywords: dict);
             return op.output;
         }
 
@@ -95,7 +100,7 @@ namespace Tensorflow
         {
             var dict = new Dictionary<string, object>();
             dict["inputs"] = inputs;
-            var op = _op_def_lib._apply_op_helper("MergeSummary", name: name, keywords: dict);
+            var op = tf.OpDefLib._apply_op_helper("MergeSummary", name: name, keywords: dict);
             return op.output;
         }
     }

@@ -4,9 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
-#if SERIALIZABLE
-using Newtonsoft.Json;
-#endif
 using static Tensorflow.Binding;
 
 namespace Tensorflow
@@ -15,7 +12,7 @@ namespace Tensorflow
     ///     Represents the shape of a `Tensor`.
     /// </summary>
     /// <remarks>https://www.tensorflow.org/api_docs/python/tf/TensorShape</remarks>
-    public class TensorShape
+    public partial class TensorShape
     {
         private readonly Shape shape;
 
@@ -38,9 +35,6 @@ namespace Tensorflow
         /// <summary>
         ///     Returns the size this shape represents.
         /// </summary>
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
         public int size
         {
             get
@@ -65,20 +59,23 @@ namespace Tensorflow
             shape = new Shape();
         }
 
+        public static TensorShape Scalar
+            => new TensorShape(new int[0]);
+
         public TensorShape(TensorShapeProto proto)
         {
             if (proto.UnknownRank) return;
             switch (proto.Dim.Count)
             {
                 case 0: shape = new Shape(new int[0]); break;
-                case 1: shape = Shape.Vector((int) proto.Dim[0].Size); break;
-                case 2: shape = Shape.Matrix((int) proto.Dim[0].Size, (int) proto.Dim[1].Size); break;
+                case 1: shape = Shape.Vector((int)proto.Dim[0].Size); break;
+                case 2: shape = Shape.Matrix((int)proto.Dim[0].Size, (int)proto.Dim[1].Size); break;
                 default:
                     var protodims = proto.Dim;
                     var len = protodims.Count;
                     var dims = new int[len];
-                    for (int i = 0; i < len; i++) 
-                        dims[i] = (int) protodims[i].Size;
+                    for (int i = 0; i < len; i++)
+                        dims[i] = (int)protodims[i].Size;
 
 
                     shape = new Shape(dims); break;
@@ -98,7 +95,7 @@ namespace Tensorflow
 
         public TensorShape(int[][] dims)
         {
-            if(dims.Length == 1)
+            if (dims.Length == 1)
             {
                 switch (dims[0].Length)
                 {
@@ -137,6 +134,8 @@ namespace Tensorflow
             }
         }
 
+        public int this[int index] => index < 0 ? dims[ndim + index] : dims[index];
+
         /// <summary>
         ///     Returns True iff `self` is fully defined in every dimension.
         /// </summary>
@@ -148,7 +147,19 @@ namespace Tensorflow
 
         public bool is_compatible_with(TensorShape shape2)
         {
-            throw new NotImplementedException("TensorShape is_compatible_with");
+            if (dims != null && shape2.dims != null)
+            {
+                if (dims.Length != shape2.dims.Length)
+                    return false;
+            }
+
+            return true;
+        }
+
+        public void assert_has_rank(int rank)
+        {
+            if (rank != ndim)
+                throw new ValueError(String.Format("Shape {0} must have rank {1}", ndim, rank));
         }
 
         [SuppressMessage("ReSharper", "ParameterHidesMember")]
@@ -238,45 +249,44 @@ namespace Tensorflow
         /// <summary>
         ///     Returns a cloned array from <see cref="dims"/>.
         /// </summary>
-        public int[] as_list() {
+        public int[] as_list()
+        {
             if (shape.IsEmpty)
                 throw new ValueError("as_list() is not defined on an unknown TensorShape.");
-            return (int[]) dims.Clone();
+            return (int[])dims.Clone();
+        }
+
+        public long[] as_list_long()
+        {
+            if (shape.IsEmpty)
+                throw new ValueError("as_list() is not defined on an unknown TensorShape.");
+            return dims.Select(x => Convert.ToInt64(x)).ToArray();
+        }
+
+        public int num_elements()
+        {
+            if (is_fully_defined())
+            {
+                var size = 1;
+                foreach (var dim in dims)
+                    size *= dim;
+                return size;
+            }
+
+            return -1;
         }
 
         public override string ToString()
         {
-            return shape.ToString();
+            switch (rank)
+            {
+                case -1:
+                    return $"<unknown>";
+                case 0:
+                    return $"()";
+                default:
+                    return $"{string.Join(",", shape).Replace("-1", "None")}";
+            }
         }
-
-        public static implicit operator TensorShape(Shape shape) => new TensorShape((int[]) shape.Dimensions.Clone());
-        public static implicit operator Shape(TensorShape shape) => new Shape((int[]) shape.dims.Clone());
-        
-        public static implicit operator int[](TensorShape shape) => (int[])shape.dims.Clone(); //we clone to avoid any changes
-        public static implicit operator TensorShape(int[] dims) => new TensorShape(dims);
-
-        public static explicit operator int(TensorShape shape) => shape.size;
-        public static implicit operator TensorShape(int dim) => new TensorShape(dim);
-
-        public static explicit operator (int, int)(TensorShape shape) => shape.dims.Length == 2 ? (shape.dims[0], shape.dims[1]) : (0, 0);
-        public static implicit operator TensorShape((int, int) dims) => new TensorShape(dims.Item1, dims.Item2);
-
-        public static explicit operator (int, int, int)(TensorShape shape) => shape.dims.Length == 3 ? (shape.dims[0], shape.dims[1], shape.dims[2]) : (0, 0, 0);
-        public static implicit operator TensorShape((int, int, int) dims) => new TensorShape(dims.Item1, dims.Item2, dims.Item3);
-
-        public static explicit operator (int, int, int, int)(TensorShape shape) => shape.dims.Length == 4 ? (shape.dims[0], shape.dims[1], shape.dims[2], shape.dims[3]) : (0, 0, 0, 0);
-        public static implicit operator TensorShape((int, int, int, int) dims) => new TensorShape(dims.Item1, dims.Item2, dims.Item3, dims.Item4);
-
-        public static explicit operator (int, int, int, int, int)(TensorShape shape) => shape.dims.Length == 5 ? (shape.dims[0], shape.dims[1], shape.dims[2], shape.dims[3], shape.dims[4]) : (0, 0, 0, 0, 0);
-        public static implicit operator TensorShape((int, int, int, int, int) dims) => new TensorShape(dims.Item1, dims.Item2, dims.Item3, dims.Item4, dims.Item5);
-
-        public static explicit operator (int, int, int, int, int, int)(TensorShape shape) => shape.dims.Length == 6 ? (shape.dims[0], shape.dims[1], shape.dims[2], shape.dims[3], shape.dims[4], shape.dims[5]) : (0, 0, 0, 0, 0, 0);
-        public static implicit operator TensorShape((int, int, int, int, int, int) dims) => new TensorShape(dims.Item1, dims.Item2, dims.Item3, dims.Item4, dims.Item5, dims.Item6);
-                
-        public static explicit operator (int, int, int, int, int, int, int)(TensorShape shape) => shape.dims.Length == 7 ? (shape.dims[0], shape.dims[1], shape.dims[2], shape.dims[3], shape.dims[4], shape.dims[5], shape.dims[6]) : (0, 0, 0, 0, 0, 0, 0);
-        public static implicit operator TensorShape((int, int, int, int, int, int, int) dims) => new TensorShape(dims.Item1, dims.Item2, dims.Item3, dims.Item4, dims.Item5, dims.Item6, dims.Item7);
-                
-        public static explicit operator (int, int, int, int, int, int, int, int)(TensorShape shape) => shape.dims.Length == 8 ? (shape.dims[0], shape.dims[1], shape.dims[2], shape.dims[3], shape.dims[4], shape.dims[5], shape.dims[6], shape.dims[7]) : (0, 0, 0, 0, 0, 0, 0, 0);
-        public static implicit operator TensorShape((int, int, int, int, int, int, int, int) dims) => new TensorShape(dims.Item1, dims.Item2, dims.Item3, dims.Item4, dims.Item5, dims.Item6, dims.Item7, dims.Item8);
     }
 }

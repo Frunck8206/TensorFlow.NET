@@ -18,8 +18,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Tensorflow.Operations.ControlFlows;
-using static Tensorflow.ControlFlowContextDef;
 using static Tensorflow.Binding;
+using static Tensorflow.ControlFlowContextDef;
 using util = Tensorflow.control_flow_util;
 
 namespace Tensorflow.Operations
@@ -41,7 +41,7 @@ namespace Tensorflow.Operations
     /// 4. A ControlFlowContext has _context_stack.
     /// Pushed and popped by ctxt.Enter() and ctxt.Exit()
     /// </summary>
-    public abstract class ControlFlowContext : IObjectLife
+    public abstract class ControlFlowContext : ITensorFlowObject
     {
         /// <summary>
         /// The predicate tensor in this branch
@@ -77,7 +77,7 @@ namespace Tensorflow.Operations
             _external_values = new Dictionary<string, ITensorOrOperation>();
         }
 
-        public string name { get => _name; }
+        public string Name { get => _name; }
         protected string _name;
 
         public void __init__(ValuesDef values_def = null, string import_scope = null)
@@ -108,7 +108,7 @@ namespace Tensorflow.Operations
             foreach (var value in values_def.Values)
                 _values.Add(value);
             var g = ops.get_default_graph();
-            foreach(var value in values_def.ExternalValues)
+            foreach (var value in values_def.ExternalValues)
             {
                 var k = ops.prepend_name_scope(value.Key, import_scope);
                 var v = value.Value;
@@ -149,7 +149,7 @@ namespace Tensorflow.Operations
 
         public void ExitResult(Tensor[] result)
         {
-            if(_outer_context != null)
+            if (_outer_context != null)
             {
                 throw new NotImplementedException("ExitResult");
             }
@@ -203,13 +203,13 @@ namespace Tensorflow.Operations
         /// </summary>
         protected virtual void _AddOpInternal(Operation op)
         {
-            if(op == null)
+            if (op == null)
             {
                 throw new NotImplementedException("");
             }
             else
             {
-                foreach(var index in range(len(op.inputs)))
+                foreach (var index in range(len(op.inputs)))
                 {
                     var x = op.inputs[index];
                     var real_x = AddValue(x);
@@ -260,7 +260,7 @@ namespace Tensorflow.Operations
             }
             else
             {
-                foreach(Operation x in op.control_inputs)
+                foreach (Operation x in op.control_inputs)
                 {
                     var ctxt = util.GetOutputContext(x);
                     if (ctxt != null && ctxt.GetWhileContext() == while_ctxt)
@@ -322,12 +322,12 @@ namespace Tensorflow.Operations
 
         public void __init__()
         {
-            
+
         }
 
         public void __del__()
         {
-            
+
         }
     }
 }

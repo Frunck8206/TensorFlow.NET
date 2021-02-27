@@ -30,7 +30,7 @@ namespace Tensorflow.Gradients
         /// Return the gradients for the 2 inputs of bias_op.
         /// </summary>
         /// <param name="op"></param>
-        /// <param name="grad"></param>
+        /// <param name="grads"></param>
         /// <returns></returns>
         [RegisterGradient("BiasAdd")]
         public static Tensor[] _BiasAddGrad(Operation op, Tensor[] grads)
@@ -53,7 +53,7 @@ namespace Tensorflow.Gradients
             var grad = grads[0];
             var x = op.inputs[0];
             var alpha = (float)op.get_attr("alpha");
-            return new Tensor[] { gen_nn_ops.leaky_relu_grad(grad, x, alpha: alpha)};
+            return new Tensor[] { gen_nn_ops.leaky_relu_grad(grad, x, alpha: alpha) };
         }
 
         /// <summary>
@@ -78,8 +78,7 @@ namespace Tensorflow.Gradients
         /// Gradient function for SoftmaxCrossEntropyWithLogits.
         /// </summary>
         /// <param name="op"></param>
-        /// <param name="grad_loss"></param>
-        /// <param name="grad_grad"></param>
+        /// <param name="grads"></param>
         /// <returns></returns>
         [RegisterGradient("SoftmaxCrossEntropyWithLogits")]
         public static Tensor[] _SoftmaxCrossEntropyWithLogitsGrad(Operation op, Tensor[] grads)
@@ -90,12 +89,12 @@ namespace Tensorflow.Gradients
             var grad = _BroadcastMul(grad_loss, softmax_grad);
 
             var logits = op.inputs[0];
-            if(grad_grad != null && !IsZero(grad_grad))
+            if (grad_grad != null && !IsZero(grad_grad))
             {
                 throw new NotImplementedException("_SoftmaxCrossEntropyWithLogitsGrad");
             }
 
-            return new Tensor[] 
+            return new Tensor[]
             {
                 grad,
                 _BroadcastMul(grad_loss, -nn_ops.log_softmax(logits))
@@ -112,7 +111,7 @@ namespace Tensorflow.Gradients
               "implementation's interaction with tf.gradients()");
 
             var grad_0 = grads[0];
-
+            
             return new Tensor[]
             {
                 _BroadcastMul(grad_0, sparse_softmax_grad_without_gradient),
@@ -120,6 +119,18 @@ namespace Tensorflow.Gradients
             };
         }
 
+        [RegisterGradient("SquaredDifference")]
+        public static Tensor[] _SquaredDifferenceGrad(Operation op, Tensor[] grads)
+        {
+           //"""Returns the gradient for (x-y)^2."""
+            Tensor x = op.inputs[0];
+            Tensor y = op.inputs[1];
+            return new Tensor[]
+            {
+                x,
+                y
+            };
+        }
         /// <summary>
         /// Gradient function for Conv2D.
         /// </summary>
@@ -129,46 +140,40 @@ namespace Tensorflow.Gradients
         [RegisterGradient("Conv2D")]
         public static Tensor[] _Conv2DGrad(Operation op, Tensor[] grads)
         {
-            var dilations = (op.get_attr("dilations") as AttrValue.Types.ListValue).I.Select(x => Convert.ToInt32(x)).ToArray();
-            var strides = (op.get_attr("strides") as AttrValue.Types.ListValue).I.Select(x => Convert.ToInt32(x)).ToArray();
-            var padding = op.get_attr("padding");
-            var explicit_paddings = (op.get_attr("explicit_paddings") as AttrValue.Types.ListValue).I.Select(x => Convert.ToInt32(x)).ToArray();
-            var use_cudnn_on_gpu = op.get_attr("use_cudnn_on_gpu");
-            var data_format = op.get_attr("data_format");
+            var dilations = op.get_attr_list<int>("dilations");
+            var strides = op.get_attr_list<int>("strides");
+            var padding = op.get_attr<string>("padding");
+            var explicit_paddings = op.get_attr_list<int>("explicit_paddings");
+            var use_cudnn_on_gpu = op.get_attr<bool>("use_cudnn_on_gpu");
+            var data_format = op.get_attr<string>("data_format");
             var shape = gen_array_ops.shape_n(new Tensor[] { op.inputs[0], op.inputs[1] });
-            
+
             return new Tensor[]
             {
-                gen_nn_ops.conv2d_backprop_input(new Conv2dParams
-                {
-                    InputSizes = shape[0],
-                    Filter = op.inputs[1],
-                    OutBackProp = grads[0],
-                    Dilations = dilations,
-                    Strides = strides,
-                    Padding = padding.ToString(),
-                    ExplicitPaddings = explicit_paddings,
-                    UseCudnnOnGpu = (bool)use_cudnn_on_gpu,
-                    DataFormat = data_format.ToString(),
-                }),
-                gen_nn_ops.conv2d_backprop_filter(new Conv2dParams
-                {
-                    Input = op.inputs[0],
-                    FilterSizes = shape[1],
-                    OutBackProp = grads[0],
-                    Dilations = dilations,
-                    Strides = strides,
-                    Padding = padding.ToString(),
-                    ExplicitPaddings = explicit_paddings,
-                    UseCudnnOnGpu = (bool)use_cudnn_on_gpu,
-                    DataFormat = data_format.ToString()
-                })
+                gen_nn_ops.conv2d_backprop_input(shape[0], op.inputs[1], grads[0],
+                    strides, padding, use_cudnn_on_gpu, explicit_paddings,
+                    dilations: dilations,
+                    data_format: data_format),
+                gen_nn_ops.conv2d_backprop_filter(op.inputs[0], shape[1], grads[0],
+                    strides, padding,
+                    dilations: dilations,
+                    explicit_paddings: explicit_paddings,
+                    use_cudnn_on_gpu: use_cudnn_on_gpu,
+                    data_format: data_format)
             };
         }
 
         [RegisterGradient("FusedBatchNorm")]
         public static Tensor[] _FusedBatchNormGrad(Operation op, Tensor[] grads)
             => _BaseFusedBatchNormGrad(op, 0, grads);
+
+        [RegisterGradient("FusedBatchNormV2")]
+        public static Tensor[] _FusedBatchNormV2Grad(Operation op, Tensor[] grads)
+            => _BaseFusedBatchNormGrad(op, 1, grads);
+
+        [RegisterGradient("FusedBatchNormV3")]
+        public static Tensor[] _FusedBatchNormV3Grad(Operation op, Tensor[] grads)
+            => _BaseFusedBatchNormGrad(op, 2, grads);
 
         /// <summary>
         /// Return the gradients for the 3 inputs of BatchNorm.
@@ -190,8 +195,10 @@ namespace Tensorflow.Gradients
             switch (version)
             {
                 case 2:
-                    throw new NotImplementedException("");
+                    grad_fun = gen_nn_ops.fused_batch_norm_grad_v3;
+                    break;
                 case 1:
+                    // grad_fun = gen_nn_ops.fused_batch_norm_grad_v2;
                     throw new NotImplementedException("");
                 default:
                     grad_fun = gen_nn_ops.fused_batch_norm_grad;
@@ -225,8 +232,8 @@ namespace Tensorflow.Gradients
                     YBackprop = grad_y,
                     X = x,
                     Scale = scale,
-                    ReserveSpace1 = op.outputs[3],
-                    ReserveSpace2 = op.outputs[4],
+                    ReserveSpace1 = pop_mean,
+                    ReserveSpace2 = pop_var,
                     ReserveSpace3 = version == 2 ? op.outputs[5] : null,
                     Epsilon = epsilon,
                     DataFormat = data_format,
@@ -239,10 +246,10 @@ namespace Tensorflow.Gradients
 
                 return new Tensor[]
                 {
-                    dx, 
-                    dscale, 
-                    doffset, 
-                    null, 
+                    dx,
+                    dscale,
+                    doffset,
+                    null,
                     null
                 };
             }
@@ -278,8 +285,8 @@ namespace Tensorflow.Gradients
                   op.inputs[0],
                   op.outputs[0],
                   grad,
-                  (op.get_attr("ksize") as AttrValue.Types.ListValue).I.Select(x => Convert.ToInt32(x)).ToArray(),
-                  (op.get_attr("strides") as AttrValue.Types.ListValue).I.Select(x => Convert.ToInt32(x)).ToArray(),
+                  op.get_attr_list<int>("ksize"),
+                  op.get_attr_list<int>("strides"),
                   padding: op.get_attr("padding").ToString(),
                   data_format: op.get_attr("data_format").ToString())
             };
@@ -309,7 +316,7 @@ namespace Tensorflow.Gradients
             var stack = array_ops.stack(new object[] { -1L, ind_lastdim });
             var ind_2d = array_ops.reshape(op.outputs[1], stack);
 
-            var in_lastdim = array_ops.gather(math_ops.cast(in_shape, TF_DataType.TF_INT64), 
+            var in_lastdim = array_ops.gather(math_ops.cast(in_shape, TF_DataType.TF_INT64),
                 array_ops.size(in_shape) - 1);
             var outerdim = array_ops.shape(ind_2d).slice(0);
 

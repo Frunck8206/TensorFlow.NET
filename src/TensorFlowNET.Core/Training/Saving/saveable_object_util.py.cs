@@ -28,10 +28,10 @@ namespace Tensorflow
         /// </summary>
         /// <param name="names_to_saveables"></param>
         /// <returns></returns>
-        public static SaveableObject[] validate_and_slice_inputs(VariableV1[] names_to_saveables)
+        public static MySaveableObject[] validate_and_slice_inputs(IVariableV1[] names_to_saveables)
         {
             var names_to_saveables_dict = op_list_to_dict(names_to_saveables);
-            var saveables = new List<SaveableObject>();
+            var saveables = new List<MySaveableObject>();
             var seen_ops = new List<Tensor>();
 
             foreach (var (name, op) in enumerate(names_to_saveables_dict))
@@ -42,7 +42,7 @@ namespace Tensorflow
             return saveables.ToArray();
         }
 
-        private static void _add_saveable<T>(List<T> saveables, List<Tensor> seen_ops, T saveable) where T : SaveableObject
+        private static void _add_saveable<T>(List<T> saveables, List<Tensor> seen_ops, T saveable) where T : MySaveableObject
         {
             if (seen_ops.Contains(saveable.op))
                 throw new ValueError($"The same saveable will be restored with two names: {saveable.name}");
@@ -57,7 +57,7 @@ namespace Tensorflow
         /// <param name="op"></param>
         /// <param name="name"></param>
         /// <returns></returns>
-        public static IEnumerable<SaveableObject> saveable_objects_for_op(Tensor op, string name)
+        public static IEnumerable<MySaveableObject> saveable_objects_for_op(Tensor op, string name)
         {
             if (false)
             {
@@ -66,22 +66,20 @@ namespace Tensorflow
             else
             {
                 ops.init_scope();
-                var variable = ops.internal_convert_to_tensor(op, as_ref: true);
-                if (variable.op.type == "Variable" ||
-                    variable.op.type == "VariableV2" ||
-                    variable.op.type == "AutoReloadVariable")
+                var variable = ops.convert_to_tensor(op, as_ref: true);
+                if (variable.dtype.is_ref_dtype())
                     yield return new ReferenceVariableSaveable(variable, "", name);
                 else
                     yield return new ResourceVariableSaveable(variable, "", name);
             }
         }
 
-        public static Dictionary<string, Tensor> op_list_to_dict(VariableV1[] op_list, bool convert_variable_to_tensor = true)
+        public static Dictionary<string, Tensor> op_list_to_dict(IVariableV1[] op_list, bool convert_variable_to_tensor = true)
         {
-            op_list = op_list.OrderBy(x => x.name).ToArray();
+            op_list = op_list.OrderBy(x => x.Name).ToArray();
             var names_to_saveables = new Dictionary<string, Tensor>();
 
-            foreach(var var in op_list)
+            foreach (var var in op_list)
             {
                 bool resource_or_ref_variable = var is RefVariable || var is ResourceVariable;
                 if (false)
@@ -102,16 +100,16 @@ namespace Tensorflow
 
                         if (convert_variable_to_tensor)
                         {
-                            if (var is ResourceVariable)
-                                tensor = var.graph_element;
+                            if (!var.dtype.is_ref_dtype())
+                                tensor = var.GraphElement;
                             else
-                                tensor = ops.internal_convert_to_tensor(var, as_ref: true);
+                                tensor = ops.convert_to_tensor(var, as_ref: true);
                         }
 
                         if (tensor.op.type == "ReadVariableOp")
                             name = tensor.op.inputs[0].op.name;
                         else
-                            name = var.op.name;
+                            name = var.Op.name;
 
                         if (names_to_saveables.ContainsKey(name))
                             throw new ValueError($"At least two variables have the same name: {name}");

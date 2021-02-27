@@ -14,6 +14,7 @@
    limitations under the License.
 ******************************************************************************/
 
+using Google.Protobuf;
 using NumSharp;
 using System;
 using System.Collections;
@@ -21,9 +22,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text;
-using Google.Protobuf;
-using NumSharp.Backends;
 using Tensorflow.Util;
+using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
@@ -39,7 +39,8 @@ namespace Tensorflow
         public BaseSession(string target = "", Graph g = null, ConfigProto config = null, Status status = null)
         {
             _graph = g ?? ops.get_default_graph();
-            _graph.as_default();
+            if (!_graph.building_function)
+                _graph.as_default();
             _target = Encoding.UTF8.GetBytes(target);
 
             using (var opts = new SessionOptions(target, config))
@@ -47,7 +48,7 @@ namespace Tensorflow
                 lock (Locks.ProcessWide)
                 {
                     status = status ?? new Status();
-                    _handle = c_api.TF_NewSession(_graph, opts, status);
+                    _handle = c_api.TF_NewSession(_graph, opts.Handle, status.Handle);
                     status.Check(true);
                 }
             }
@@ -65,11 +66,12 @@ namespace Tensorflow
 
         public virtual NDArray run(ITensorOrOperation fetche, params FeedItem[] feed_dict)
         {
-            return _run(fetche, feed_dict)[0];
+            var results = _run(fetche, feed_dict);
+            return fetche is Tensor ? results[0] : null;
         }
 
         public virtual (NDArray, NDArray, NDArray, NDArray, NDArray) run(
-            (ITensorOrOperation, ITensorOrOperation, ITensorOrOperation, ITensorOrOperation, ITensorOrOperation) fetches, 
+            (ITensorOrOperation, ITensorOrOperation, ITensorOrOperation, ITensorOrOperation, ITensorOrOperation) fetches,
             params FeedItem[] feed_dict)
         {
             var results = _run(new object[] { fetches.Item1, fetches.Item2, fetches.Item3, fetches.Item4, fetches.Item5 }, feed_dict);
@@ -78,19 +80,19 @@ namespace Tensorflow
 
         public virtual (NDArray, NDArray, NDArray, NDArray) run((ITensorOrOperation, ITensorOrOperation, ITensorOrOperation, ITensorOrOperation) fetches, params FeedItem[] feed_dict)
         {
-            var results = _run(new object[] {fetches.Item1, fetches.Item2, fetches.Item3, fetches.Item4}, feed_dict);
+            var results = _run(new object[] { fetches.Item1, fetches.Item2, fetches.Item3, fetches.Item4 }, feed_dict);
             return (results[0], results[1], results[2], results[3]);
         }
 
         public virtual (NDArray, NDArray, NDArray) run((ITensorOrOperation, ITensorOrOperation, ITensorOrOperation) fetches, params FeedItem[] feed_dict)
         {
-            var results = _run(new object[] {fetches.Item1, fetches.Item2, fetches.Item3}, feed_dict);
+            var results = _run(new object[] { fetches.Item1, fetches.Item2, fetches.Item3 }, feed_dict);
             return (results[0], results[1], results[2]);
         }
 
         public virtual (NDArray, NDArray) run((ITensorOrOperation, ITensorOrOperation) fetches, params FeedItem[] feed_dict)
         {
-            var results = _run(new object[] {fetches.Item1, fetches.Item2}, feed_dict);
+            var results = _run(new object[] { fetches.Item1, fetches.Item2 }, feed_dict);
             return (results[0], results[1]);
         }
 
@@ -135,7 +137,7 @@ namespace Tensorflow
 
             // We only want to really perform the run if fetches or targets are provided,
             // or if the call is a partial run that specifies feeds.
-            var results = _do_run(final_targets.Select(x => (Operation) x).ToList(), final_fetches, feed_dict_tensor);
+            var results = _do_run(final_targets.Select(x => (Operation)x).ToList(), final_fetches, feed_dict_tensor);
 
             return fetch_handler.build_results(this, results);
         }
@@ -143,7 +145,6 @@ namespace Tensorflow
         /// <summary>
         /// Runs a step based on the given fetches and feeds.
         /// </summary>
-        /// <typeparam name="T"></typeparam>
         /// <param name="target_list">A list of operations to be run, but not fetched.</param>
         /// <param name="fetch_list"></param>
         /// <param name="feed_dict"></param>
@@ -235,22 +236,22 @@ namespace Tensorflow
             // Ensure any changes to the graph are reflected in the runtime.
             _extend_graph();
 
-            var status = new Status();
+            var status = tf.Status;
 
             var output_values = fetch_list.Select(x => IntPtr.Zero).ToArray();
 
             c_api.TF_SessionRun(_handle,
                 run_options: null,
                 inputs: feed_dict.Select(f => f.Key).ToArray(),
-                input_values: feed_dict.Select(f => (IntPtr) f.Value).ToArray(),
+                input_values: feed_dict.Select(f => (IntPtr)f.Value).ToArray(),
                 ninputs: feed_dict.Length,
                 outputs: fetch_list,
                 output_values: output_values,
                 noutputs: fetch_list.Length,
-                target_opers: target_list.Select(f => (IntPtr) f).ToArray(),
+                target_opers: target_list.Select(f => (IntPtr)f).ToArray(),
                 ntargets: target_list.Count,
                 run_metadata: IntPtr.Zero,
-                status: status);
+                status: status.Handle);
 
             status.Check(true);
 
@@ -264,179 +265,8 @@ namespace Tensorflow
 
         private static unsafe NDArray fetchValue(IntPtr output)
         {
-            NDArray ret;
-            using (var tensor = new Tensor(output))
-            {
-                var ndims = tensor.shape;
-                var srcAddress = c_api.TF_TensorData(output).ToInt64();
-
-                if (ndims.Length == 0)
-                {
-                    switch (tensor.dtype)
-                    {
-                        case TF_DataType.TF_BOOL:
-                            ret = NDArray.Scalar(*(bool*) srcAddress);
-                            break;
-                        case TF_DataType.TF_STRING:
-                            using (var reader = new CodedInputStream(new IntPtr(srcAddress).Stream(8, (long) tensor.bytesize)))
-                            	ret = new NDArray(reader.ReadBytes().ToByteArray());
-                            break;
-                        case TF_DataType.TF_UINT8:
-                            ret = NDArray.Scalar(*(byte*) srcAddress);
-                            break;
-                        case TF_DataType.TF_INT16:
-                            ret = NDArray.Scalar(*(short*) srcAddress);
-                            break;
-                        case TF_DataType.TF_INT32:
-                            ret = NDArray.Scalar(*(int*) srcAddress);
-                            break;
-                        case TF_DataType.TF_INT64:
-                            ret = NDArray.Scalar(*(long*) srcAddress);
-                            break;
-                        case TF_DataType.TF_UINT16:
-                            ret = NDArray.Scalar(*(ushort*) srcAddress);
-                            break;
-                        case TF_DataType.TF_UINT32:
-                            ret = NDArray.Scalar(*(uint*) srcAddress);
-                            break;
-                        case TF_DataType.TF_UINT64:
-                            ret = NDArray.Scalar(*(ulong*) srcAddress);
-                            break;
-                        case TF_DataType.TF_FLOAT:
-                            ret = NDArray.Scalar(*(float*) srcAddress);
-                            break;
-                        case TF_DataType.TF_DOUBLE:
-                            ret = NDArray.Scalar(*(double*) srcAddress);
-                            break;
-                        default:
-                            throw new NotImplementedException("can't fetch output");
-                    }
-                } else
-                {
-                    //var size = (long) tensor.size;
-                    //var itemsize = (long) tensor.itemsize;
-                    var bytesize = (long) tensor.bytesize;
-                    var src = (void*) srcAddress;
-
-#if _REGEN
-		            #region Compute
-		            switch (tensor.dtype)
-		            {
-			            %foreach except(supported_dtypes, "Char"),except(supported_dtypes_lowercase, "char"),except(supported_dtypes_TF_DataType,"TF_STRING")%
-			            case TF_DataType.#3:
-			            {
-                            ret = new NDArray(NPTypeCode.#1, ndims, false);
-                            System.Buffer.MemoryCopy(src, #(#3=="TF_STRING"|"(byte*)ret.Unsafe.Address + 8"|"ret.Unsafe.Address"), bytesize, bytesize);
-				            break;
-			            }
-			            %
-                        case TF_DataType.TF_STRING: 
-                        {
-                            //TODO:! This is not the way to handle string[], it should be done with TF_DecodeString
-                            using (var reader = new CodedInputStream(new IntPtr(srcAddress).Stream(8, (long)tensor.bytesize)))
-                                ret = NDArray.FromString(reader.ReadString());
-                            break;
-                        }
-			            default:
-				            throw new NotSupportedException();
-		            }
-		            #endregion
-#else
-
-                    #region Compute
-
-                    switch (tensor.dtype)
-                    {
-                        case TF_DataType.TF_BOOL:
-                        {
-                            ret = new NDArray(NPTypeCode.Boolean, ndims, false);
-                            System.Buffer.MemoryCopy(src, ret.Unsafe.Address, bytesize, bytesize);
-                            break;
-                        }
-
-                        case TF_DataType.TF_UINT8:
-                        {
-                            ret = new NDArray(NPTypeCode.Byte, ndims, false);
-                            System.Buffer.MemoryCopy(src, ret.Unsafe.Address, bytesize, bytesize);
-                            break;
-                        }
-
-                        case TF_DataType.TF_INT16:
-                        {
-                            ret = new NDArray(NPTypeCode.Int16, ndims, false);
-                            System.Buffer.MemoryCopy(src, ret.Unsafe.Address, bytesize, bytesize);
-                            break;
-                        }
-
-                        case TF_DataType.TF_UINT16:
-                        {
-                            ret = new NDArray(NPTypeCode.UInt16, ndims, false);
-                            System.Buffer.MemoryCopy(src, ret.Unsafe.Address, bytesize, bytesize);
-                            break;
-                        }
-
-                        case TF_DataType.TF_INT32:
-                        {
-                            ret = new NDArray(NPTypeCode.Int32, ndims, false);
-                            System.Buffer.MemoryCopy(src, ret.Unsafe.Address, bytesize, bytesize);
-                            break;
-                        }
-
-                        case TF_DataType.TF_UINT32:
-                        {
-                            ret = new NDArray(NPTypeCode.UInt32, ndims, false);
-                            System.Buffer.MemoryCopy(src, ret.Unsafe.Address, bytesize, bytesize);
-                            break;
-                        }
-
-                        case TF_DataType.TF_INT64:
-                        {
-                            ret = new NDArray(NPTypeCode.Int64, ndims, false);
-                            System.Buffer.MemoryCopy(src, ret.Unsafe.Address, bytesize, bytesize);
-                            break;
-                        }
-
-                        case TF_DataType.TF_UINT64:
-                        {
-                            ret = new NDArray(NPTypeCode.UInt64, ndims, false);
-                            System.Buffer.MemoryCopy(src, ret.Unsafe.Address, bytesize, bytesize);
-                            break;
-                        }
-
-                        case TF_DataType.TF_DOUBLE:
-                        {
-                            ret = new NDArray(NPTypeCode.Double, ndims, false);
-                            System.Buffer.MemoryCopy(src, ret.Unsafe.Address, bytesize, bytesize);
-                            break;
-                        }
-
-                        case TF_DataType.TF_FLOAT:
-                        {
-                            ret = new NDArray(NPTypeCode.Single, ndims, false);
-                            System.Buffer.MemoryCopy(src, ret.Unsafe.Address, bytesize, bytesize);
-                            break;
-                        }
-
-                        case TF_DataType.TF_STRING:
-                        {
-                            throw new NotImplementedException();
-                            //TODO:! This is not the way to handle string[], it should be done with TF_DecodeString
-                            using (var reader = new CodedInputStream(new IntPtr(srcAddress).Stream(8, (long) tensor.bytesize)))
-                                ret = NDArray.FromString(reader.ReadString());
-                            break;
-                        }
-
-                        default:
-                            throw new NotSupportedException();
-                    }
-
-                    #endregion
-
-#endif
-                }
-            }
-
-            return ret;
+            var tensor = new Tensor(output);
+            return tensor.numpy();
         }
 
         /// <summary>
@@ -452,17 +282,12 @@ namespace Tensorflow
         private void _extend_graph()
         { }
 
-        public void close()
-        {
-            Dispose();
-        }
-
         protected override void DisposeUnmanagedResources(IntPtr handle)
         {
             lock (Locks.ProcessWide)
                 using (var status = new Status())
                 {
-                    c_api.TF_DeleteSession(handle, status);
+                    c_api.TF_DeleteSession(handle, status.Handle);
                     status.Check(true);
                 }
         }

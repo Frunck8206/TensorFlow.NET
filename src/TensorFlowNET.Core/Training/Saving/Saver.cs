@@ -29,7 +29,7 @@ namespace Tensorflow
     /// </summary>
     public class Saver
     {
-        private VariableV1[] _var_list;
+        private IVariableV1[] _var_list;
         private bool _reshape;
         private bool _sharded;
         private int _max_to_keep;
@@ -42,15 +42,19 @@ namespace Tensorflow
         private bool _is_built;
         private SaverDef.Types.CheckpointFormatVersion _write_version;
         private bool _pad_step_number;
+#pragma warning disable CS0649 // Field 'Saver._filename' is never assigned to, and will always have its default value null
         private string _filename;
+#pragma warning restore CS0649 // Field 'Saver._filename' is never assigned to, and will always have its default value null
         private bool _is_empty;
         private float _next_checkpoint_time;
         private bool _save_relative_paths;
+#pragma warning disable CS0414 // The field 'Saver._object_restore_saver' is assigned but its value is never used
         private bool? _object_restore_saver;
+#pragma warning restore CS0414 // The field 'Saver._object_restore_saver' is assigned but its value is never used
         private Dictionary<string, float> _last_checkpoints;
         private Dictionary<string, float> _checkpoints_to_be_deleted;
 
-        public Saver(VariableV1[] var_list = null,
+        public Saver(IVariableV1[] var_list = null,
             bool reshape = false,
             bool sharded = false,
             int max_to_keep = 5,
@@ -82,7 +86,7 @@ namespace Tensorflow
 
             if (!defer_build)
                 build();
-            if(_saver_def != null)
+            if (_saver_def != null)
             {
                 _check_saver_def();
                 _write_version = _saver_def.Version;
@@ -151,7 +155,7 @@ namespace Tensorflow
 
         private void _check_saver_def()
         {
-            if (!tf.context.executing_eagerly())
+            if (!tf.Context.executing_eagerly())
             {
                 if (string.IsNullOrEmpty(_saver_def.SaveTensorName))
                     throw new ValueError($"saver_def must specify the save_tensor_name: {_saver_def}");
@@ -189,7 +193,7 @@ namespace Tensorflow
 
                 if (write_state)
                 {
-                    var path = UTF8Encoding.UTF8.GetString((byte[])model_checkpoint_path[0]);
+                    var path = NDArray.AsStringArray(model_checkpoint_path[0])[0];
                     _RecordLastCheckpoint(path);
                     checkpoint_management.update_checkpoint_state_internal(
                         save_dir: save_path_parent,
@@ -207,10 +211,10 @@ namespace Tensorflow
                 export_meta_graph(meta_graph_filename, strip_default_attrs: strip_default_attrs, save_debug_info: save_debug_info);
             }
 
-            return _is_empty ? string.Empty : UTF8Encoding.UTF8.GetString((byte[])model_checkpoint_path[0]);
+            return _is_empty ? string.Empty : NDArray.AsStringArray(model_checkpoint_path[0])[0];
         }
 
-        public (Saver, object) import_meta_graph(string meta_graph_or_file, 
+        public (Saver, object) import_meta_graph(string meta_graph_or_file,
             bool clear_devices = false,
             string import_scope = "")
         {
@@ -238,10 +242,12 @@ namespace Tensorflow
             if (!checkpoint_management.checkpoint_exists(save_path))
                 throw new ValueError($"The passed save_path is not a valid checkpoint: {save_path}");
 
-            Console.WriteLine($"Restoring parameters from {save_path}");
+            Binding.tf_output_redirect.WriteLine($"Restoring parameters from {save_path}");
 
-            if (tf.context.executing_eagerly())
+            if (tf.Context.executing_eagerly())
+#pragma warning disable CS0642 // Possible mistaken empty statement
                 ;
+#pragma warning restore CS0642 // Possible mistaken empty statement
             else
                 sess.run(_saver_def.RestoreOpName,
                     new FeedItem(_saver_def.FilenameTensorName, save_path));
@@ -257,7 +263,7 @@ namespace Tensorflow
         /// <param name="clear_devices"></param>
         /// <param name="clear_extraneous_savers"></param>
         /// <param name="strip_default_attrs"></param>
-        public MetaGraphDef export_meta_graph(string filename= "",
+        public MetaGraphDef export_meta_graph(string filename = "",
                         string[] collection_list = null,
                         string export_scope = "",
                         bool as_text = false,
@@ -284,9 +290,9 @@ namespace Tensorflow
             SaverDef saver_def = null,
             string[] collection_list = null,
             bool as_text = false,
-            bool clear_devices= false,
-            bool clear_extraneous_savers= false,
-            bool strip_default_attrs= false,
+            bool clear_devices = false,
+            bool clear_extraneous_savers = false,
+            bool strip_default_attrs = false,
             string export_scope = "")
         {
             var meta_graph_def = meta_graph.export_scoped_meta_graph(

@@ -18,30 +18,24 @@ using System;
 
 namespace Tensorflow
 {
-    public class ImportGraphDefOptions : DisposableObject
+    public sealed class ImportGraphDefOptions : IDisposable
     {
-        public int NumReturnOutputs 
-            => c_api.TF_ImportGraphDefOptionsNumReturnOutputs(_handle);
+        public SafeImportGraphDefOptionsHandle Handle { get; }
+
+        public int NumReturnOutputs
+            => c_api.TF_ImportGraphDefOptionsNumReturnOutputs(Handle);
 
         public ImportGraphDefOptions()
         {
-            _handle = c_api.TF_NewImportGraphDefOptions();
-        }
-
-        public ImportGraphDefOptions(IntPtr handle)
-        {
-            _handle = handle;
+            Handle = c_api.TF_NewImportGraphDefOptions();
         }
 
         public void AddReturnOutput(string name, int index)
         {
-            c_api.TF_ImportGraphDefOptionsAddReturnOutput(_handle, name, index);
+            c_api.TF_ImportGraphDefOptionsAddReturnOutput(Handle, name, index);
         }
 
-        protected override void DisposeUnmanagedResources(IntPtr handle)
-            => c_api.TF_DeleteImportGraphDefOptions(handle);
-
-        public static implicit operator IntPtr(ImportGraphDefOptions opts) => opts._handle;
-        public static implicit operator ImportGraphDefOptions(IntPtr handle) => new ImportGraphDefOptions(handle);
+        public void Dispose()
+            => Handle.Dispose();
     }
 }

@@ -16,31 +16,31 @@
 
 namespace Tensorflow
 {
-    public class SaveableObject
+    public class MySaveableObject
     {
         public Tensor op;
         public SaveSpec[] specs;
         public string name;
         public string device;
 
-        public SaveableObject()
+        public MySaveableObject()
         {
 
         }
 
-        public SaveableObject(Tensor var, string slice_spec, string name)
+        public MySaveableObject(Tensor var, string slice_spec, string name)
         {
 
         }
 
-        public SaveableObject(Tensor op, SaveSpec[] specs, string name)
+        public MySaveableObject(Tensor op, SaveSpec[] specs, string name)
         {
             this.op = op;
             this.specs = specs;
             this.name = name;
         }
 
-        public virtual ITensorOrOperation restore(Tensor[] restored_tensors, TensorShape[] restored_shapes = null)
+        public virtual Operation restore(Tensor[] restored_tensors, TensorShape[] restored_shapes = null)
         {
             var restored_tensor = restored_tensors[0];
             return gen_state_ops.assign(op,

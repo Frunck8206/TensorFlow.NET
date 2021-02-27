@@ -19,14 +19,14 @@ using System.Threading;
 
 namespace Tensorflow
 {
-    public partial class tensorflow : IObjectLife
+    public partial class tensorflow
     {
-        protected ThreadLocal<Session> _defaultSessionFactory;
+        protected ThreadLocal<Session> defaultSessionFactory;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void _constructThreadingObjects()
+        public void ConstructThreadingObjects()
         {
-            _defaultSessionFactory = new ThreadLocal<Session>(() => new Session());
+            defaultSessionFactory = new ThreadLocal<Session>(() => new Session());
         }
 
         public Session defaultSession
@@ -34,7 +34,7 @@ namespace Tensorflow
             get
             {
                 if (!ops.IsSingleThreaded)
-                    return _defaultSessionFactory.Value;
+                    return defaultSessionFactory.Value;
 
                 return ops.get_default_session();
             }
@@ -42,7 +42,7 @@ namespace Tensorflow
             {
                 if (!ops.IsSingleThreaded)
                 {
-                    _defaultSessionFactory.Value = value;
+                    defaultSessionFactory.Value = value;
                     return;
                 }
 

@@ -4,7 +4,6 @@
 namespace Microsoft.VisualStudio.TestTools.UnitTesting
 {
     using System;
-    using System.Collections.Generic;
     //using System.Diagnostics;
     //using System.Diagnostics.CodeAnalysis;
     using System.Globalization;
@@ -20,7 +19,9 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         // bind everything
         private const BindingFlags BindToEveryThing = BindingFlags.Default | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Public;
 
+#pragma warning disable CS0414 // The field 'PrivateObject.constructorFlags' is assigned but its value is never used
         private static BindingFlags constructorFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.CreateInstance | BindingFlags.NonPublic;
+#pragma warning restore CS0414 // The field 'PrivateObject.constructorFlags' is assigned but its value is never used
 
         private object target; // automatically initialized to null
         private Type originalType; // automatically initialized to null
@@ -237,8 +238,9 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
                 //Debug.Assert(this.target != null, "target should not be null.");
                 if (typeof(PrivateObject) == obj?.GetType())
                 {
-                    return this.target.Equals(((PrivateObject) obj).target);
-                } else
+                    return this.target.Equals(((PrivateObject)obj).target);
+                }
+                else
                 {
                     return false;
                 }
@@ -569,7 +571,7 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         public void SetFieldOrProperty(string name, BindingFlags bindingFlags, object value)
         {
             Helper.CheckParameterNotNull(name, "name", string.Empty);
-            this.InvokeHelper(name, BindingFlags.SetField | BindingFlags.SetProperty | bindingFlags, new object[] {value}, CultureInfo.InvariantCulture);
+            this.InvokeHelper(name, BindingFlags.SetField | BindingFlags.SetProperty | bindingFlags, new object[] { value }, CultureInfo.InvariantCulture);
         }
 
         ///// <summary>
@@ -743,7 +745,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
             try
             {
                 return this.originalType.InvokeMember(name, bindingFlags, null, this.target, args, culture);
-            } catch (TargetInvocationException e)
+            }
+            catch (TargetInvocationException e)
             {
                 //Debug.Assert(e.InnerException != null, "Inner exception should not be null.");
                 if (e.InnerException != null)

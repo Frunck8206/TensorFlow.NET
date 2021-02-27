@@ -15,56 +15,80 @@
 ******************************************************************************/
 
 using System;
-using Tensorflow;
-using static Keras.Keras;
-using NumSharp;
-using Tensorflow.Operations.Activation;
+using System.Collections.Generic;
+using System.Linq;
+using Tensorflow.Keras.ArgsDefinition;
+using Tensorflow.Keras.Engine;
 using static Tensorflow.Binding;
 
-namespace Keras.Layers
+namespace Tensorflow.Keras.Layers
 {
+    /// <summary>
+    /// Just your regular densely-connected NN layer.
+    /// </summary>
     public class Dense : Layer
     {
-        RefVariable W;
-        int units;
-        TensorShape WShape;
-        string name;
-        IActivation activation;
+        DenseArgs args;
+        IVariableV1 kernel;
+        IVariableV1 bias;
+        Activation activation => args.Activation;
 
-        public Dense(int units, string name = null, IActivation activation = null)
+        public Dense(DenseArgs args) :
+            base(args)
         {
-            this.activation = activation;
-            this.units = units;
-            this.name = (string.IsNullOrEmpty(name) || string.IsNullOrWhiteSpace(name))?this.GetType().Name + "_" + this.GetType().GUID:name;
+            this.args = args;
+            this.SupportsMasking = true;
+            this.inputSpec = new InputSpec(min_ndim: 2);
         }
-        public Layer __build__(TensorShape input_shape, int seed = 1, float stddev = -1f)
+
+        protected override void build(Tensors inputs)
         {
-            Console.WriteLine("Building Layer \"" + name + "\" ...");
-            if (stddev == -1)
-                stddev = (float)(1 / Math.Sqrt(2));
-            var dim = input_shape.dims;
-            var input_dim = dim[dim.Length - 1];
-            W = tf.Variable(create_tensor(new int[] { input_dim, units }, seed: seed, stddev: (float)stddev));
-            WShape = new TensorShape(W.shape);
-            return this;
+            TensorShape input_shape = inputs.shape;
+            var last_dim = input_shape.dims.Last();
+            var axes = new Dictionary<int, int>();
+            axes[-1] = last_dim;
+            inputSpec = new InputSpec(min_ndim: 2, axes: axes);
+            kernel = add_weight(
+                "kernel",
+                shape: new TensorShape(last_dim, args.Units),
+                initializer: args.KernelInitializer,
+                dtype: DType,
+                trainable: true);
+            if (args.UseBias)
+                bias = add_weight(
+                  "bias",
+                  shape: new TensorShape(args.Units),
+                  initializer: args.BiasInitializer,
+                  dtype: DType,
+                  trainable: true);
+
+            built = true;
         }
-        public Tensor __call__(Tensor x)
+
+        protected override Tensors Call(Tensors inputs, Tensor state = null, bool? training = null)
         {
-            var dot = tf.matmul(x, W);
-            if (this.activation != null)
-                dot = activation.Activate(dot);
-            Console.WriteLine("Calling Layer \"" + name + "(" + np.array(dot.TensorShape.dims).ToString() + ")\" ...");
-            return dot;
+            Tensor outputs = null;
+            var rank = inputs.rank;
+            if (rank > 2)
+            {
+                throw new NotImplementedException("call rank > 2");
+            }
+            else
+            {
+                outputs = gen_math_ops.mat_mul(inputs, kernel.AsTensor());
+            }
+
+            if (args.UseBias)
+                outputs = tf.nn.bias_add(outputs, bias);
+            if (args.Activation != null)
+                outputs = activation(outputs);
+
+            return outputs;
         }
-        public TensorShape __shape__()
+
+        public static Dense from_config(LayerArgs args)
         {
-            return WShape;
-        }
-        public TensorShape output_shape(TensorShape input_shape)
-        {
-            var output_shape = input_shape.dims;
-            output_shape[output_shape.Length - 1] = units;
-            return new TensorShape(output_shape);
+            return new Dense(args as DenseArgs);
         }
     }
 }

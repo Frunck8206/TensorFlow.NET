@@ -1,21 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading;
-using FluentAssertions;
+﻿using FluentAssertions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
-using NumSharp;
+using System;
+using System.Diagnostics;
+using System.Threading;
 using Tensorflow;
-using Tensorflow.Util;
 using static Tensorflow.Binding;
 
 namespace TensorFlowNET.UnitTest
 {
     [TestClass]
-    public class EnforcedSinglethreadingTests : CApiTest
+    public class EnforcedSinglethreadingTests
     {
         private static readonly object _singlethreadLocker = new object();
 
@@ -63,11 +57,13 @@ namespace TensorFlowNET.UnitTest
                 try
                 {
                     ret = fnc();
-                } catch (Exception ee)
+                }
+                catch (Exception ee)
                 {
                     e = ee;
                     throw;
-                } finally
+                }
+                finally
                 {
                     mrh.Set();
                 }
@@ -90,11 +86,13 @@ namespace TensorFlowNET.UnitTest
                 try
                 {
                     fnc();
-                } catch (Exception ee)
+                }
+                catch (Exception ee)
                 {
                     e = ee;
                     throw;
-                } finally
+                }
+                finally
                 {
                     mrh.Set();
                 }

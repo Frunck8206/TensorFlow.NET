@@ -32,15 +32,15 @@ namespace Tensorflow {
             "BCADKAkSDQoFbGFiZWwYBSABKAkSEAoIcHJpb3JpdHkYBiABKAUaTQoOQXR0",
             "ckNvbnN0cmFpbnQSDAoEbmFtZRgBIAEoCRItCg5hbGxvd2VkX3ZhbHVlcxgC",
             "IAEoCzIVLnRlbnNvcmZsb3cuQXR0clZhbHVlIjMKCktlcm5lbExpc3QSJQoG",
-            "a2VybmVsGAEgAygLMhUudGVuc29yZmxvdy5LZXJuZWxEZWZCbwoYb3JnLnRl",
-            "bnNvcmZsb3cuZnJhbWV3b3JrQg9LZXJuZWxEZWZQcm90b3NQAVo9Z2l0aHVi",
-            "LmNvbS90ZW5zb3JmbG93L3RlbnNvcmZsb3cvdGVuc29yZmxvdy9nby9jb3Jl",
-            "L2ZyYW1ld29ya/gBAWIGcHJvdG8z"));
+            "a2VybmVsGAEgAygLMhUudGVuc29yZmxvdy5LZXJuZWxEZWZCgwEKGG9yZy50",
+            "ZW5zb3JmbG93LmZyYW1ld29ya0IPS2VybmVsRGVmUHJvdG9zUAFaUWdpdGh1",
+            "Yi5jb20vdGVuc29yZmxvdy90ZW5zb3JmbG93L3RlbnNvcmZsb3cvZ28vY29y",
+            "ZS9mcmFtZXdvcmsva2VybmVsX2RlZl9nb19wcm90b/gBAWIGcHJvdG8z"));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Tensorflow.AttrValueReflection.Descriptor, },
-          new pbr::GeneratedClrTypeInfo(null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.KernelDef), global::Tensorflow.KernelDef.Parser, new[]{ "Op", "DeviceType", "Constraint", "HostMemoryArg", "Label", "Priority" }, null, null, new pbr::GeneratedClrTypeInfo[] { new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.KernelDef.Types.AttrConstraint), global::Tensorflow.KernelDef.Types.AttrConstraint.Parser, new[]{ "Name", "AllowedValues" }, null, null, null)}),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.KernelList), global::Tensorflow.KernelList.Parser, new[]{ "Kernel" }, null, null, null)
+          new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.KernelDef), global::Tensorflow.KernelDef.Parser, new[]{ "Op", "DeviceType", "Constraint", "HostMemoryArg", "Label", "Priority" }, null, null, null, new pbr::GeneratedClrTypeInfo[] { new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.KernelDef.Types.AttrConstraint), global::Tensorflow.KernelDef.Types.AttrConstraint.Parser, new[]{ "Name", "AllowedValues" }, null, null, null, null)}),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.KernelList), global::Tensorflow.KernelList.Parser, new[]{ "Kernel" }, null, null, null, null)
           }));
     }
     #endregion
@@ -460,7 +460,7 @@ namespace Tensorflow {
           }
           if (other.allowedValues_ != null) {
             if (allowedValues_ == null) {
-              allowedValues_ = new global::Tensorflow.AttrValue();
+              AllowedValues = new global::Tensorflow.AttrValue();
             }
             AllowedValues.MergeFrom(other.AllowedValues);
           }
@@ -481,9 +481,9 @@ namespace Tensorflow {
               }
               case 18: {
                 if (allowedValues_ == null) {
-                  allowedValues_ = new global::Tensorflow.AttrValue();
+                  AllowedValues = new global::Tensorflow.AttrValue();
                 }
-                input.ReadMessage(allowedValues_);
+                input.ReadMessage(AllowedValues);
                 break;
               }
             }

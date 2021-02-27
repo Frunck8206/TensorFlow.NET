@@ -42,7 +42,7 @@ namespace Tensorflow.Operations
         /// <summary>
         /// A 4-D tensor of shape
         /// </summary>
-        public Tensor Filter { get; set; }
+        public IVariableV1 Filter { get; set; }
 
         /// <summary>
         /// An integer vector representing the tensor shape of `filter`
@@ -71,7 +71,7 @@ namespace Tensorflow.Operations
 
         public bool UseCudnnOnGpu { get; set; } = true;
 
-        public int[] Dilations { get; set; } = new [] { 1, 1, 1, 1 };
+        public int[] Dilations { get; set; } = new int[] { 1, 1, 1, 1 };
 
         public Conv2dParams()
         {

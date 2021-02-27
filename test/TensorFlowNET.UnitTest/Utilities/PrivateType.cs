@@ -375,7 +375,7 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         public void SetStaticFieldOrProperty(string name, BindingFlags bindingFlags, object value)
         {
             Helper.CheckParameterNotNull(name, "name", string.Empty);
-            this.InvokeHelperStatic(name, BindingFlags.SetField | BindingFlags.SetProperty | bindingFlags | BindingFlags.Static, new[] {value}, CultureInfo.InvariantCulture);
+            this.InvokeHelperStatic(name, BindingFlags.SetField | BindingFlags.SetProperty | bindingFlags | BindingFlags.Static, new[] { value }, CultureInfo.InvariantCulture);
         }
 
         ///// <summary>
@@ -509,7 +509,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
             try
             {
                 return this.type.InvokeMember(name, bindingFlags | BindToEveryThing | BindingFlags.Static, null, null, args, culture);
-            } catch (TargetInvocationException e)
+            }
+            catch (TargetInvocationException e)
             {
                 //Debug.Assert(e.InnerException != null, "Inner Exception should not be null.");
                 if (e.InnerException != null)
@@ -548,19 +549,19 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
             }
         }
 
-        /// <summary>
-        /// The check parameter not null or empty.
-        /// </summary>
-        /// <param name="param">
-        /// The parameter.
-        /// </param>
-        /// <param name="parameterName">
-        /// The parameter name.
-        /// </param>
-        /// <param name="message">
-        /// The message.
-        /// </param>
-        /// <exception cref="ArgumentException"> Throws ArgumentException when parameter is null. </exception>
+        ///// <summary>
+        ///// The check parameter not null or empty.
+        ///// </summary>
+        ///// <param name="param">
+        ///// The parameter.
+        ///// </param>
+        ///// <param name="parameterName">
+        ///// The parameter name.
+        ///// </param>
+        ///// <param name="message">
+        ///// The message.
+        ///// </param>
+        ///// <exception cref="ArgumentException"> Throws ArgumentException when parameter is null. </exception>
         //internal static void CheckParameterNotNullOrEmpty(string param, string parameterName, string message)
         //{
         //    if (string.IsNullOrEmpty(param))

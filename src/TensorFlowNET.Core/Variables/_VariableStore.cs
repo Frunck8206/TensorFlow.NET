@@ -27,7 +27,9 @@ namespace Tensorflow
     {
         private Dictionary<string, object> _vars;
         private Dictionary<string, object> _partitioned_vars;
+#pragma warning disable CS0414 // The field '_VariableStore._store_eager_variables' is assigned but its value is never used
         private bool _store_eager_variables;
+#pragma warning restore CS0414 // The field '_VariableStore._store_eager_variables' is assigned but its value is never used
 
         public _VariableStore()
         {
@@ -36,7 +38,7 @@ namespace Tensorflow
             _store_eager_variables = false;
         }
 
-        public VariableV1 get_variable(string name,
+        public IVariableV1 get_variable(string name,
             TensorShape shape = null,
             TF_DataType dtype = TF_DataType.TF_FLOAT,
             object initializer = null, // IInitializer or Tensor
@@ -50,9 +52,9 @@ namespace Tensorflow
             dtype = dtype.as_base_dtype();
             trainable = variable_scope._get_trainable_value(synchronization, trainable);
 
-            return _true_getter(name, 
-                shape: shape, 
-                dtype: dtype, 
+            return _true_getter(name,
+                shape: shape,
+                dtype: dtype,
                 initializer: initializer,
                 trainable: trainable,
                 collections: collections,
@@ -61,7 +63,7 @@ namespace Tensorflow
                 aggregation: aggregation);
         }
 
-        private VariableV1 _true_getter(string name,
+        private IVariableV1 _true_getter(string name,
             TensorShape shape = null,
             TF_DataType dtype = TF_DataType.TF_FLOAT,
             object initializer = null,
@@ -90,7 +92,7 @@ namespace Tensorflow
                 return _get_single_variable(name: name,
                     shape: shape,
                     dtype: dtype,
-                    initializer: tensor,
+                    init_value: tensor,
                     trainable: trainable,
                     validate_shape: validate_shape,
                     synchronization: synchronization,
@@ -110,10 +112,11 @@ namespace Tensorflow
             }
         }
 
-        private VariableV1 _get_single_variable(string name,
+        private IVariableV1 _get_single_variable(string name,
             TensorShape shape = null,
             TF_DataType dtype = TF_DataType.DtInvalid,
             IInitializer initializer = null,
+            Tensor init_value = null,
             bool reuse = false,
             bool? trainable = null,
             List<string> collections = null,
@@ -122,9 +125,9 @@ namespace Tensorflow
             VariableSynchronization synchronization = VariableSynchronization.Auto,
             VariableAggregation aggregation = VariableAggregation.None)
         {
-            bool initializing_from_value = false;
+            bool initializing_from_value = init_value != null;
             if (use_resource == null)
-                use_resource = false;
+                use_resource = variable_scope._DEFAULT_USE_RESOURCE;
 
             if (_vars.ContainsKey(name))
             {
@@ -136,9 +139,9 @@ namespace Tensorflow
                 throw new NotImplementedException("_get_single_variable");
             }
 
-            VariableV1 v = null;
+            IVariableV1 v = null;
             // Create the tensor to initialize the variable with default value.
-            if (initializer == null)
+            if (initializer == null && init_value == null)
             {
                 if (dtype.is_floating())
                 {
@@ -152,11 +155,14 @@ namespace Tensorflow
             {
                 if (initializing_from_value)
                 {
-
+                    v = new ResourceVariable(init_value,
+                        name: name,
+                        validate_shape: validate_shape,
+                        trainable: trainable.Value);
                 }
                 else
                 {
-                    Func<Tensor> init_val = () => initializer.call(shape, dtype);
+                    Func<Tensor> init_val = () => initializer.Apply(new InitializerArgs(shape, dtype: dtype));
                     var variable_dtype = dtype.as_base_dtype();
 
                     v = variable_scope.default_variable_creator(init_val,
@@ -164,50 +170,11 @@ namespace Tensorflow
                         trainable: trainable,
                         collections: collections,
                         dtype: variable_dtype,
+                        use_resource: use_resource,
                         validate_shape: validate_shape,
                         synchronization: synchronization,
                         aggregation: aggregation);
                 }
-            }
-
-            _vars[name] = v;
-
-            return v;
-        }
-
-        private RefVariable _get_single_variable(string name,
-            TensorShape shape = null,
-            TF_DataType dtype = TF_DataType.DtInvalid,
-            Tensor initializer = null,
-            bool reuse = false,
-            bool? trainable = null,
-            bool validate_shape = false,
-            bool? use_resource = null,
-            VariableSynchronization synchronization = VariableSynchronization.Auto,
-            VariableAggregation aggregation = VariableAggregation.None)
-        {
-            if (use_resource == null)
-                use_resource = false;
-
-            if (_vars.ContainsKey(name))
-            {
-                if (!reuse)
-                {
-                    var var = _vars[name];
-
-                }
-                throw new NotImplementedException("_get_single_variable");
-            }
-
-            RefVariable v = null;
-            // Create the variable.
-            ops.init_scope();
-            {
-                var init_val = initializer;
-                v = new RefVariable(init_val,
-                    name: name,
-                    validate_shape: validate_shape,
-                    trainable: trainable.Value);
             }
 
             _vars[name] = v;

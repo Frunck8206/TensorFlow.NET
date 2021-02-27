@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using static Tensorflow.Binding;
+﻿using static Tensorflow.Binding;
 
 namespace Tensorflow.Train
 {
@@ -16,7 +13,7 @@ namespace Tensorflow.Train
         /// <param name="zero_debias"></param>
         /// <param name="name"></param>
         /// <returns></returns>
-        public static Tensor assign_moving_average(RefVariable variable, RefVariable value, Tensor decay,
+        public static Tensor assign_moving_average(IVariableV1 variable, IVariableV1 value, Tensor decay,
             bool zero_debias = true, string name = null)
         {
             return tf_with(ops.name_scope(name, "AssignMovingAvg", new { variable, value, decay }), scope =>
@@ -25,7 +22,7 @@ namespace Tensorflow.Train
                 if (decay.dtype != variable.dtype.as_base_dtype())
                     decay = math_ops.cast(decay, variable.dtype.as_base_dtype());
 
-                return state_ops.assign_sub(variable, (variable - value) * decay, name: scope);
+                return state_ops.assign_sub(variable, (variable.AsTensor() - value.AsTensor()) * decay, name: scope);
             });
         }
     }

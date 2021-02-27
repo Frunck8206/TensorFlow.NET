@@ -1,12 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using static Tensorflow.Binding;
-using Tensorflow.Operations.Activation;
 using Tensorflow.Keras.Engine;
 using Tensorflow.Operations;
+using Tensorflow.Operations.Activation;
+using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
@@ -21,8 +18,8 @@ namespace Tensorflow
         bool _state_is_tuple;
         IActivation _activation;
         LSTMStateTuple _state;
-        VariableV1 _kernel;
-        VariableV1 _bias;
+        IVariableV1 _kernel;
+        IVariableV1 _bias;
         string _WEIGHTS_VARIABLE_NAME = "kernel";
         string _BIAS_VARIABLE_NAME = "bias";
 
@@ -40,7 +37,7 @@ namespace Tensorflow
             IActivation activation = null, bool? reuse = null, string name = null,
             TF_DataType dtype = TF_DataType.DtInvalid) : base(_reuse: reuse, name: name, dtype: dtype)
         {
-            input_spec = new InputSpec(ndim: 2);
+            inputSpec = new InputSpec(ndim: 2);
             _num_units = num_units;
             _forget_bias = forget_bias;
             _state_is_tuple = state_is_tuple;
@@ -61,7 +58,7 @@ namespace Tensorflow
             built = true;
         }
 
-        public Tensor[] __call__(Tensor inputs, LSTMStateTuple state)
+        public Tensor __call__(Tensor inputs, LSTMStateTuple state)
         {
             _state = state;
             return base.__call__(inputs);
@@ -74,24 +71,24 @@ namespace Tensorflow
         /// <param name="training"></param>
         /// <param name="state"></param>
         /// <returns></returns>
-        protected override Tensor[] call(Tensor inputs, Tensor training = null, Tensor state = null)
+        protected Tensors Call(Tensors inputs, Tensor state = null, bool is_training = false)
         {
             var one = constant_op.constant(1, dtype: dtypes.int32);
             // Parameters of gates are concatenated into one multiply for efficiency.
             Tensor c = null;
             Tensor h = null;
-            if(_state_is_tuple)
+            if (_state_is_tuple)
                 (c, h) = ((Tensor)_state.c, (Tensor)_state.h);
             else
             {
                 // array_ops.split(value: state, num_or_size_splits: 2, axis: one);
                 throw new NotImplementedException("BasicLstmCell call");
             }
-            var gate_inputs = math_ops.matmul(array_ops.concat(new[] { inputs, h }, 1), _kernel as RefVariable);
-            gate_inputs = nn_ops.bias_add(gate_inputs, _bias as RefVariable);
+            var gate_inputs = math_ops.matmul(array_ops.concat(new[] { (Tensor)inputs, h }, 1), _kernel.AsTensor());
+            gate_inputs = nn_ops.bias_add(gate_inputs, _bias);
 
             // i = input_gate, j = new_input, f = forget_gate, o = output_gate
-            var tensors = array_ops.split(value: gate_inputs, num_or_size_splits: 4, axis: one);
+            var tensors = array_ops.split(value: gate_inputs, num_split: 4, axis: one);
             var (i, j, f, o) = (tensors[0], tensors[1], tensors[2], tensors[3]);
 
             var forget_bias_tensor = constant_op.constant(_forget_bias, dtype: f.dtype);
@@ -105,9 +102,9 @@ namespace Tensorflow
 
 
             if (_state_is_tuple)
-                return new[] { new_c, new_h };
+                return new_c;
             else
-                return new[] { array_ops.concat(new[] { new_c, new_h }, 1) };
+                return array_ops.concat(new[] { new_c, new_h }, 1);
         }
 
         public override object get_initial_state(Tensor inputs = null, Tensor batch_size = null, TF_DataType dtype = TF_DataType.DtInvalid)

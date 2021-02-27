@@ -1,10 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Tensorflow.Keras.ArgsDefinition;
+using Tensorflow.Operations;
 
 namespace Tensorflow.Keras.Layers
 {
-    class MaxPooling1D
+    public class MaxPooling1D : Pooling1D
     {
+        public MaxPooling1D(Pooling1DArgs args)
+            : base(args)
+        {
+            args.PoolFunction = new MaxPoolFunction();
+        }
     }
 }

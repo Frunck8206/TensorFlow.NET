@@ -51,26 +51,26 @@ namespace Tensorflow
         /// <param name="import_scope"></param>
         /// <param name="imported_vars"></param>
         /// <returns></returns>
-        public static Saver _create_saver_from_imported_meta_graph(MetaGraphDef meta_graph_def, 
-            string import_scope, 
-            Dictionary<string, VariableV1> imported_vars)
+        public static Saver _create_saver_from_imported_meta_graph(MetaGraphDef meta_graph_def,
+            string import_scope,
+            Dictionary<string, IVariableV1> imported_vars)
         {
-            if(meta_graph_def.SaverDef != null)
+            if (meta_graph_def.SaverDef != null)
             {
                 // Infer the scope that is prepended by `import_scoped_meta_graph`.
                 string scope = import_scope;
                 var var_names = imported_vars.Keys.ToArray();
-                if(var_names.Length > 0)
+                if (var_names.Length > 0)
                 {
                     var sample_key = var_names[0];
                     var sample_var = imported_vars[sample_key];
-                    scope = string.Join("", sample_var.name.Skip(sample_key.Length));
+                    scope = string.Join("", sample_var.Name.Skip(sample_key.Length));
                 }
                 return new Saver(saver_def: meta_graph_def.SaverDef, name: scope);
             }
             else
             {
-                if(variables._all_saveable_objects(scope: import_scope).Length > 0)
+                if (variables._all_saveable_objects(scope: import_scope).Length > 0)
                 {
                     // Return the default saver instance for all graph variables.
                     return new Saver();
@@ -78,14 +78,14 @@ namespace Tensorflow
                 else
                 {
                     // If no graph variables exist, then a Saver cannot be constructed.
-                    Console.WriteLine("Saver not created because there are no variables in the" +
+                    Binding.tf_output_redirect.WriteLine("Saver not created because there are no variables in the" +
                         " graph to restore");
                     return null;
                 }
             }
         }
 
-        public static string freeze_graph(string checkpoint_dir, 
+        public static string freeze_graph(string checkpoint_dir,
             string output_pb_name,
             string[] output_node_names)
         {
@@ -102,7 +102,7 @@ namespace Tensorflow
                 var output_graph_def = tf.graph_util.convert_variables_to_constants(sess,
                     graph.as_graph_def(),
                     output_node_names);
-                Console.WriteLine($"Froze {output_graph_def.Node.Count} nodes.");
+                Binding.tf_output_redirect.WriteLine($"Froze {output_graph_def.Node.Count} nodes.");
                 File.WriteAllBytes(output_pb, output_graph_def.ToByteArray());
                 return output_pb;
             }
@@ -112,7 +112,7 @@ namespace Tensorflow
         {
             var bytes = File.ReadAllBytes(freeze_graph_pb);
             var graph = tf.Graph().as_default();
-            importer.import_graph_def(GraphDef.Parser.ParseFrom(bytes), 
+            importer.import_graph_def(GraphDef.Parser.ParseFrom(bytes),
                 name: name);
             return graph;
         }

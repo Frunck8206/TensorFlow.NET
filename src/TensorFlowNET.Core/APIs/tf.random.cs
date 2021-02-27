@@ -18,22 +18,51 @@ namespace Tensorflow
 {
     public partial class tensorflow
     {
-        /// <summary>
-        /// Outputs random values from a normal distribution.
-        /// </summary>
-        /// <param name="shape"></param>
-        /// <param name="mean"></param>
-        /// <param name="stddev"></param>
-        /// <param name="dtype"></param>
-        /// <param name="seed"></param>
-        /// <param name="name"></param>
-        /// <returns></returns>
-        public Tensor random_normal(TensorShape shape,
-            float mean = 0.0f,
-            float stddev = 1.0f,
-            TF_DataType dtype = TF_DataType.TF_FLOAT,
-            int? seed = null,
-            string name = null) => random_ops.random_normal(shape, mean, stddev, dtype, seed, name);
+        public Random random => new Random();
+
+        public class Random
+        {
+            /// <summary>
+            /// Outputs random values from a normal distribution.
+            /// </summary>
+            /// <param name="shape"></param>
+            /// <param name="mean"></param>
+            /// <param name="stddev"></param>
+            /// <param name="dtype"></param>
+            /// <param name="seed"></param>
+            /// <param name="name"></param>
+            /// <returns></returns>
+            public Tensor normal(TensorShape shape,
+                float mean = 0.0f,
+                float stddev = 1.0f,
+                TF_DataType dtype = TF_DataType.TF_FLOAT,
+                int? seed = null,
+                string name = null) => random_ops.random_normal(shape, mean, stddev, dtype, seed, name);
+
+            /// <summary>
+            /// Outputs random values from a truncated normal distribution.
+            /// </summary>
+            /// <param name="shape"></param>
+            /// <param name="mean"></param>
+            /// <param name="stddev"></param>
+            /// <param name="dtype"></param>
+            /// <param name="seed"></param>
+            /// <param name="name"></param>
+            /// <returns></returns>
+            public Tensor truncated_normal(TensorShape shape,
+                float mean = 0.0f,
+                float stddev = 1.0f,
+                TF_DataType dtype = TF_DataType.TF_FLOAT,
+                int? seed = null,
+                string name = null) => random_ops.truncated_normal(shape, mean, stddev, dtype, seed, name);
+
+            public Tensor categorical(
+                Tensor logits,
+                int num_samples,
+                int? seed = null,
+                string name = null,
+                TF_DataType output_dtype = TF_DataType.DtInvalid) => random_ops.multinomial(logits, num_samples, seed: seed, name: name, output_dtype: output_dtype);
+        }
 
         public Tensor random_uniform(TensorShape shape,
             float minval = 0,
@@ -64,11 +93,16 @@ namespace Tensorflow
             => random_ops.random_shuffle(value, seed: seed, name: name);
 
         public void set_random_seed(int seed)
-            => ops.get_default_graph().seed = seed;
+        {
+            if (executing_eagerly())
+                Context.set_global_seed(seed);
+            else
+                ops.get_default_graph().seed = seed;
+        }
 
         public Tensor multinomial(Tensor logits, int num_samples, int? seed = null,
             string name = null, TF_DataType output_dtype = TF_DataType.DtInvalid)
-            => random_ops.multinomial(logits, num_samples, seed: seed, 
+            => random_ops.multinomial(logits, num_samples, seed: seed,
                 name: name, output_dtype: output_dtype);
     }
 }

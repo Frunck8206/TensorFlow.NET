@@ -1,17 +1,18 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NumSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using NumSharp;
 using Tensorflow;
+using Tensorflow.UnitTest;
 using Tensorflow.Util;
-using Buffer = Tensorflow.Buffer;
 using static Tensorflow.Binding;
+using Buffer = Tensorflow.Buffer;
 
-namespace TensorFlowNET.UnitTest
+namespace TensorFlowNET.UnitTest.Basics
 {
     [TestClass]
-    public class OperationsTest
+    public class OperationsTest : GraphModeTestBase
     {
         /// <summary>
         /// Port from tensorflow\c\c_api_test.cc
@@ -21,8 +22,8 @@ namespace TensorFlowNET.UnitTest
         public void GetAllOpList()
         {
             var handle = c_api.TF_GetAllOpList();
-            var buffer = new Buffer(handle);
-            var op_list = OpList.Parser.ParseFrom(buffer.MemoryBlock.Stream());
+            using var buffer = new Buffer(handle);
+            var op_list = OpList.Parser.ParseFrom(buffer.DangerousMemoryBlock.Stream());
 
             var _registered_ops = new Dictionary<string, OpDef>();
             foreach (var op_def in op_list.Op)
@@ -40,9 +41,9 @@ namespace TensorFlowNET.UnitTest
             var b = tf.placeholder(tf.float32);
             var c = tf.add(a, b);
 
-            using(var sess = tf.Session())
+            using (var sess = tf.Session())
             {
-                var o = sess.run(c, 
+                var o = sess.run(c,
                     new FeedItem(a, 3.0f),
                     new FeedItem(b, 2.0f));
                 Assert.AreEqual((float)o, 5.0f);
@@ -122,7 +123,7 @@ namespace TensorFlowNET.UnitTest
                 Assert.IsTrue(o.array_equal(check));
             }
 
-            b = tf.cumsum(a, exclusive:true, reverse: true);
+            b = tf.cumsum(a, exclusive: true, reverse: true);
             check = np.array(15, 14, 12, 9, 5, 0);
 
             using (var sess = tf.Session())
@@ -135,7 +136,7 @@ namespace TensorFlowNET.UnitTest
         [TestMethod]
         public void logicalOpsTest()
         {
-            var a = tf.constant(new[] {1f, 2f, 3f, 4f, -4f, -3f, -2f, -1f});
+            var a = tf.constant(new[] { 1f, 2f, 3f, 4f, -4f, -3f, -2f, -1f });
             var b = tf.less(a, 0f);
             var c = tf.greater(a, 0f);
             var d = tf.cast(tf.logical_and(b, c), tf.int32);
@@ -515,7 +516,7 @@ namespace TensorFlowNET.UnitTest
 
         private IEnumerable<int> MultiplyArray(IReadOnlyCollection<int> first, IReadOnlyCollection<int> second)
         {
-            if(first.Count != second.Count)
+            if (first.Count != second.Count)
                 throw new ArgumentException("Arrays should be of equal size!");
 
             var firstEnumerator = first.GetEnumerator();
@@ -534,7 +535,7 @@ namespace TensorFlowNET.UnitTest
         }
         private IEnumerable<float> MultiplyArray(IReadOnlyCollection<float> first, IReadOnlyCollection<float> second)
         {
-            if(first.Count != second.Count)
+            if (first.Count != second.Count)
                 throw new ArgumentException("Arrays should be of equal size!");
 
             var firstEnumerator = first.GetEnumerator();
@@ -553,7 +554,7 @@ namespace TensorFlowNET.UnitTest
         }
         private IEnumerable<double> MultiplyArray(IReadOnlyCollection<double> first, IReadOnlyCollection<double> second)
         {
-            if(first.Count != second.Count)
+            if (first.Count != second.Count)
                 throw new ArgumentException("Arrays should be of equal size!");
 
             var firstEnumerator = first.GetEnumerator();
@@ -725,6 +726,7 @@ namespace TensorFlowNET.UnitTest
             #endregion
         }
 
+        [Ignore]
         [TestMethod]
         public void divOpTests()
         {
@@ -786,7 +788,7 @@ namespace TensorFlowNET.UnitTest
 
             var firstFloatFeed = Enumerable.Repeat(firstFloatVal, rows * cols).ToArray();
             var secondFloatFeed = Enumerable.Repeat(secondFloatVal, rows * cols).ToArray();
-            var floatResult = MultiplyArray(firstFloatFeed, secondFloatFeed.Select(x => 1/x).ToArray()).Sum();
+            var floatResult = MultiplyArray(firstFloatFeed, secondFloatFeed.Select(x => 1 / x).ToArray()).Sum();
 
             a = tf.placeholder(tf.float32, shape: new TensorShape(rows, cols));
             b = tf.placeholder(tf.float32, shape: new TensorShape(rows, cols));
@@ -835,7 +837,7 @@ namespace TensorFlowNET.UnitTest
 
             var firstDoubleFeed = Enumerable.Repeat(firstDoubleVal, rows * cols).ToArray();
             var secondDoubleFeed = Enumerable.Repeat(secondDoubleVal, rows * cols).ToArray();
-            var doubleResult = MultiplyArray(firstDoubleFeed, secondDoubleFeed.Select(x => 1/x).ToArray()).Sum();
+            var doubleResult = MultiplyArray(firstDoubleFeed, secondDoubleFeed.Select(x => 1 / x).ToArray()).Sum();
 
             a = tf.placeholder(tf.float64, shape: new TensorShape(rows, cols));
             b = tf.placeholder(tf.float64, shape: new TensorShape(rows, cols));

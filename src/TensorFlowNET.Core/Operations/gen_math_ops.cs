@@ -1,4 +1,4 @@
-﻿/*****************************************************************************
+/*****************************************************************************
    Copyright 2018 The TensorFlow.NET Authors. All Rights Reserved.
 
    Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,17 +14,18 @@
    limitations under the License.
 ******************************************************************************/
 
+using System;
+using System.Linq;
+using Tensorflow.Contexts;
 using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
-    public static class gen_math_ops
+    public static partial class gen_math_ops
     {
-        public static OpDefLibrary _op_def_lib = new OpDefLibrary();
-
         public static Tensor _all(Tensor input, Tensor axis, bool keep_dims = false, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("All", name, args: new { input, reduction_indices = axis, keep_dims = keep_dims });
+            var _op = tf.OpDefLib._apply_op_helper("All", name, args: new { input, reduction_indices = axis, keep_dims = keep_dims });
 
             return _op.outputs[0];
         }
@@ -36,11 +37,10 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <returns></returns>
         public static Tensor add_n(Tensor[] inputs, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("AddN", name, args: new { inputs });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("AddN", name, new ExecuteOpArgs()
+            {
+                OpInputArgs = new object[] { inputs }
+            });
 
         /// <summary>
         /// Returns the index with the largest value across dimensions of a tensor.
@@ -51,7 +51,9 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <returns></returns>
         public static Tensor arg_max(Tensor input, int dimension, TF_DataType output_type = TF_DataType.TF_INT64, string name = null)
-            => _op_def_lib._apply_op_helper("ArgMax", name, args: new { input, dimension, output_type }).outputs[0];
+            => tf.Context.ExecuteOp("ArgMax", name, new ExecuteOpArgs(input, dimension)
+                .SetAttributes(new { output_type }));
+
 
         /// <summary>
         /// Returns the index with the smallest value across dimensions of a tensor.
@@ -61,8 +63,8 @@ namespace Tensorflow
         /// <param name="output_type"></param>
         /// <param name="name"></param>
         /// <returns></returns>
-        public static Tensor arg_min(Tensor input, int dimension, TF_DataType output_type= TF_DataType.TF_INT64, string name= null)
-            =>_op_def_lib._apply_op_helper("ArgMin", name, args: new { input, dimension, output_type }).outputs[0];
+        public static Tensor arg_min(Tensor input, int dimension, TF_DataType output_type = TF_DataType.TF_INT64, string name = null)
+            => tf.OpDefLib._apply_op_helper("ArgMin", name, args: new { input, dimension, output_type }).outputs[0];
 
         /// <summary>
         /// Computes Psi, the derivative of Lgamma (the log of the absolute value of
@@ -72,7 +74,7 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <returns></returns>
         public static Tensor digamma(Tensor x, string name = null)
-            => _op_def_lib._apply_op_helper("Digamma", name, args: new { x }).output;
+            => tf.OpDefLib._apply_op_helper("Digamma", name, args: new { x }).output;
 
         /// <summary>
         ///    Returns 0 if the denominator is zero.
@@ -93,10 +95,10 @@ namespace Tensorflow
         ///    [here](http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html)
         /// </remarks>
         public static Tensor div_no_nan(Tensor x, Tensor y, string name = null)
-        {
-            var op = _op_def_lib._apply_op_helper("DivNoNan", name: name, args: new { x, y });
-            return op.output;
-        }
+            => tf.Context.ExecuteOp("DivNoNan", name, new ExecuteOpArgs(x, y));
+
+        public static Tensor mean(Tensor input, int axis, bool keep_dims = false, string name = null)
+            => mean(input, ops.convert_to_tensor(axis), keep_dims: keep_dims, name: name);
 
         /// <summary>
         /// Computes the mean of elements across dimensions of a tensor.
@@ -111,61 +113,84 @@ namespace Tensorflow
         /// <param name="keep_dims"> An optional `bool`. Defaults to `False`. If true, retain reduced dimensions with length 1.</param>
         /// <param name="name"> A name for the operation (optional).</param>
         /// <returns> A `Tensor`. Has the same type as `input`.</returns>
-        public static Tensor mean<T1, T2>(T1 input, T2 axis, bool keep_dims= false, string name = null)
+        public static Tensor mean(Tensor input, Tensor axis, bool keep_dims = false, string name = null)
+            => tf.Context.ExecuteOp("Mean", name, new ExecuteOpArgs(input, axis)
+            {
+                GetGradientAttrs = (op) => new
+                {
+                    T = op.get_attr<TF_DataType>("T"),
+                    Tidx = op.get_attr<TF_DataType>("Tidx"),
+                    keep_dims = op.get_attr<bool>("keep_dims")
+                }
+            }.SetAttributes(new { keep_dims, reduction_indices = axis }));
+
+        public static Tensor mean(Tensor[] inputs, Tensor axis, bool keep_dims = false, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Mean", name, args: new { input, reduction_indices = axis, keep_dims = keep_dims });
+            if (tf.Context.executing_eagerly())
+            {
+                return mean_eager_fallback(inputs, axis, keep_dims: keep_dims, name: name, ctx: tf.Context);
+            }
+
+            var _op = tf.OpDefLib._apply_op_helper("Mean", name, args: new { inputs, reduction_indices = axis, keep_dims = keep_dims });
 
             return _op.output;
         }
 
-        public static Tensor prod<T1, T2>(T1 input, T2 axis, bool keep_dims = false, string name = null)
+        private static Tensor mean_eager_fallback(Tensor[] inputs, Tensor axis, bool keep_dims = false, string name = null, Context ctx = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Prod", name, args: new { input, reduction_indices = axis, keep_dims });
+            var (_attr_T, input) = tf.Runner.ArgsToMatchingEager(ctx, args: new[] { inputs });
+            var (_attr_Tidx, axis1) = tf.Runner.ArgsToMatchingEager(ctx, default_dtype: tf.int32, args: new[] { axis });
+            var _inputs_flat = input.concat(axis1);
+            var _attrs = new object[] { "keep_dims", keep_dims, "T", _attr_T, "Tidx", _attr_Tidx };
 
-            return _op.outputs[0];
+            return tf.Runner.Execute(ctx, "Mean", 1, _inputs_flat, _attrs, name: name)[0];
+        }
+
+        public static Tensor prod<T1, T2>(T1 input, T2 axis, bool keep_dims = false, string name = null)
+            => tf.Context.ExecuteOp("Prod", name, 
+                new ExecuteOpArgs(input, axis).SetAttributes(new { keep_dims, reduction_indices = axis }));
+
+        private static Tensor prod_eager_fallback(Tensor input_t, int[] axis, bool keep_dims, string name, Context ctx = null)
+        {
+            var (_attr_T, input) = tf.Runner.ArgsToMatchingEager(ctx, args: new[] { input_t });
+            var (_attr_Tidx, axis1) = tf.Runner.ArgsToMatchingEager(ctx, default_dtype: tf.int32, args: new[] { axis });
+            var _inputs_flat = input.concat(axis1);
+            var _attrs = new object[] { "keep_dims", keep_dims, "T", _attr_T, "Tidx", _attr_Tidx };
+
+            return tf.Runner.Execute(ctx, "Prod", 1, _inputs_flat, _attrs, name: name)[0];
         }
 
         public static Tensor acos(Tensor x, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Acos", name, args: new { x });
+            var _op = tf.OpDefLib._apply_op_helper("Acos", name, args: new { x });
 
             return _op.outputs[0];
         }
 
         public static Tensor asin(Tensor x, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Asin", name, args: new { x });
+            var _op = tf.OpDefLib._apply_op_helper("Asin", name, args: new { x });
 
             return _op.outputs[0];
         }
+
+        public static Tensor add(Tensor x, Tensor y, string name = null)
+            => tf.Context.ExecuteOp("Add", name, new ExecuteOpArgs(x, y));
 
         public static Tensor add<Tx, Ty>(Tx x, Ty y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Add", name, args: new { x, y });
+            => tf.Context.ExecuteOp("Add", name, new ExecuteOpArgs(x, y));
 
-            return _op.output;
-        }
+        public static Tensor add_v2<Tx, Ty>(Tx x, Ty y, string name = null)
+            => tf.Context.ExecuteOp("AddV2", name, new ExecuteOpArgs(x, y));
 
         public static Tensor atan(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Atan", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Atan", name, new ExecuteOpArgs(x));
 
         public static Tensor ceil(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Ceil", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Ceil", name, new ExecuteOpArgs(x));
 
         public static Tensor sin(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Sin", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Sin", name, new ExecuteOpArgs(x));
 
         /// <summary>
         ///    Computes sigmoid of <c>x</c> element-wise.
@@ -182,11 +207,7 @@ namespace Tensorflow
         ///    Specifically, <c>y = 1 / (1 + exp(-x))</c>.
         /// </remarks>
         public static Tensor sigmoid(Tensor x, string name = "Sigmoid")
-        {
-            var op = _op_def_lib._apply_op_helper("Sigmoid", name: name, new { x });
-
-            return op.output;
-        }
+            => tf.Context.ExecuteOp("Sigmoid", name, new ExecuteOpArgs(x));
 
         /// <summary>
         ///    Computes the gradient of the sigmoid of <c>x</c> wrt its input.
@@ -206,43 +227,24 @@ namespace Tensorflow
         ///    <c>dy</c> is the corresponding input gradient.
         /// </remarks>
         public static Tensor sigmoid_grad(Tensor y, Tensor dy, string name = "SigmoidGrad")
-        {
-            var op = _op_def_lib._apply_op_helper("SigmoidGrad", name: name, args: new { y, dy });
+            => tf.Context.ExecuteOp("SigmoidGrad", name, new ExecuteOpArgs(y, dy));
 
-            return op.outputs[0];
-        }
-
-        public static Tensor sign(Tensor x, string name = "Sign")
-        {
-            var op = _op_def_lib._apply_op_helper("Sign", name: name, args: new {x});
-
-            return op.outputs[0];
-        }
+        public static Tensor sign<T>(T x, string name = "Sign")
+            => tf.Context.ExecuteOp("Sign", name, new ExecuteOpArgs(x));
 
         public static Tensor sinh(Tensor x, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Sinh", name, args: new { x });
+            var _op = tf.OpDefLib._apply_op_helper("Sinh", name, args: new { x });
 
             return _op.outputs[0];
         }
 
-        public static Tensor cos(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Cos", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+        public static Tensor cos<T>(T x, string name = null)
+            => tf.Context.ExecuteOp("Cos", name, new ExecuteOpArgs(x));
 
         public static Tensor cosh(Tensor x, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Cosh", name, args: new { x });
-
-            return _op.outputs[0];
-        }
-
-        public static Tensor cumsum<T>(Tensor x, T axis, bool exclusive = false, bool reverse = false, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Cumsum", name, args: new { x, axis, exclusive, reverse });
+            var _op = tf.OpDefLib._apply_op_helper("Cosh", name, args: new { x });
 
             return _op.outputs[0];
         }
@@ -257,23 +259,15 @@ namespace Tensorflow
         /// <returns></returns>
         public static Tensor unsorted_segment_sum(Tensor data, Tensor segment_ids, Tensor num_segments, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("UnsortedSegmentSum", name, new { data, segment_ids, num_segments });
+            var _op = tf.OpDefLib._apply_op_helper("UnsortedSegmentSum", name, new { data, segment_ids, num_segments });
             return _op.outputs[0];
         }
 
         public static Tensor tan(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Tan", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Tan", name, new ExecuteOpArgs(x));
 
         public static Tensor tanh(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Tanh", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Tanh", name, new ExecuteOpArgs(x));
 
         /// <summary>
         /// Computes the gradient for the tanh of `x` wrt its input.
@@ -283,28 +277,24 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <returns></returns>
         public static Tensor tanh_grad(Tensor y, Tensor dy, string name = null)
-            => _op_def_lib._apply_op_helper("TanhGrad", name: name, args: new { y, dy }).output;
+            => tf.Context.ExecuteOp("TanhGrad", name, new ExecuteOpArgs(y, dy));
 
         public static Tensor floor(Tensor x, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Floor", name, args: new { x });
+            var _op = tf.OpDefLib._apply_op_helper("Floor", name, args: new { x });
 
             return _op.outputs[0];
         }
 
         public static Tensor _clip_by_value(Tensor t, Tensor clip_value_min, Tensor clip_value_max, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("ClipByValue", name, args: new { t, clip_value_min, clip_value_max });
+            var _op = tf.OpDefLib._apply_op_helper("ClipByValue", name, args: new { t, clip_value_min, clip_value_max });
 
             return _op.outputs[0];
         }
 
         public static Tensor greater<Tx, Ty>(Tx x, Ty y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Greater", name: name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Greater", name, new ExecuteOpArgs(x, y));
 
         /// <summary>
         /// Computes the log of the absolute value of `Gamma(x)` element-wise.
@@ -319,56 +309,39 @@ namespace Tensorflow
         /// </returns>
         public static Tensor lgamma(Tensor x, string name = null)
         {
-            var op = _op_def_lib._apply_op_helper("Lgamma", name: name, args: new { x });
+            var op = tf.OpDefLib._apply_op_helper("Lgamma", name: name, args: new { x });
 
             return op.output;
         }
 
         public static Tensor greater_equal<Tx, Ty>(Tx x, Ty y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("GreaterEqual", name: name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("GreaterEqual", name, new ExecuteOpArgs(x, y));
 
         public static Tensor less<Tx, Ty>(Tx x, Ty y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Less", name: name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Less", name, new ExecuteOpArgs(x, y));
 
         public static Tensor less_equal<Tx, Ty>(Tx x, Ty y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("LessEqual", name: name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("LessEqual", name, new ExecuteOpArgs(x, y));
 
         public static Tensor log1p(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Log1p", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Log1p", name, new ExecuteOpArgs(x));
 
         public static Tensor logical_and(Tensor x, Tensor y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("LogicalAnd", name, args: new { x, y });
+            => tf.OpDefLib._apply_op_helper("LogicalAnd", name, args: new { x, y });
 
-            return _op.outputs[0];
-        }
+        public static Tensor logical_and(bool x, bool y, string name = null)
+            => tf.Context.ExecuteOp("LogicalAnd", name, new ExecuteOpArgs(x, y));
 
         public static Tensor logical_not(Tensor x, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("LogicalNot", name, args: new { x });
+            var _op = tf.OpDefLib._apply_op_helper("LogicalNot", name, args: new { x });
 
             return _op.outputs[0];
         }
 
         public static Tensor logical_or(Tensor x, Tensor y, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("LogicalOr", name, args: new { x, y });
+            var _op = tf.OpDefLib._apply_op_helper("LogicalOr", name, args: new { x, y });
 
             return _op.outputs[0];
         }
@@ -382,11 +355,7 @@ namespace Tensorflow
         }
 
         public static Tensor squared_difference(Tensor x, Tensor y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("SquaredDifference", name, args: new { x, y, name });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("SquaredDifference", name, new ExecuteOpArgs(x, y));
 
         /// <summary>
         /// Computes square of x element-wise.
@@ -395,11 +364,7 @@ namespace Tensorflow
         /// <param name="name"> A name for the operation (optional).</param>
         /// <returns> A `Tensor`. Has the same type as `x`.</returns>
         public static Tensor square(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Square", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Square", name, new ExecuteOpArgs(x));
 
         /// <summary>
         /// Returns which elements of x are finite.
@@ -409,14 +374,14 @@ namespace Tensorflow
         /// <returns> A `Tensor` of type `bool`.</returns>
         public static Tensor is_finite(Tensor x, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("IsFinite", name, args: new { x });
+            var _op = tf.OpDefLib._apply_op_helper("IsFinite", name, args: new { x });
 
             return _op.outputs[0];
         }
 
         public static Tensor is_nan(Tensor x, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("IsNan", name: name, args: new { x });
+            var _op = tf.OpDefLib._apply_op_helper("IsNan", name: name, args: new { x });
 
             return _op.outputs[0];
         }
@@ -428,11 +393,7 @@ namespace Tensorflow
         /// <param name="name"> A name for the operation (optional).</param>
         /// <returns> A `Tensor`. Has the same type as `x`.</returns>
         public static Tensor exp(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Exp", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Exp", name, new ExecuteOpArgs(x));
 
         /// <summary>
         /// Computes natural logarithm of x element-wise.
@@ -441,39 +402,26 @@ namespace Tensorflow
         /// <param name="name"> name: A name for the operation (optional).</param>
         /// <returns> A `Tensor`. Has the same type as `x`.</returns>
         public static Tensor log(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Log", name, args: new { x });
+            => tf.Context.ExecuteOp("Log", name, new ExecuteOpArgs(x));
 
-            return _op.outputs[0];
-        }
-
-        public static Tensor cast(Tensor x, TF_DataType DstT, bool Truncate= false, string name= "")
-        {
-            var _op = _op_def_lib._apply_op_helper("Cast", name, args: new { x, DstT, Truncate });
-
-            return _op.outputs[0];
-        }
+        public static Tensor softplus(Tensor features, string name = null)
+            => tf.Context.ExecuteOp("Softplus", name, new ExecuteOpArgs(features));
+        
+        public static Tensor cast(Tensor x, TF_DataType DstT, bool Truncate = false, string name = null)
+            => tf.Context.ExecuteOp("Cast", name, new ExecuteOpArgs(x)
+                .SetAttributes(new { DstT, Truncate }));
 
         public static Tensor neg(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Neg", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Neg", name, new ExecuteOpArgs(x));
 
         public static Tensor sqrt(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Sqrt", name, args: new { x });
+            => tf.Context.ExecuteOp("Sqrt", name, new ExecuteOpArgs(x));
 
-            return _op.outputs[0];
-        }
+        public static Tensor sub(Tensor x, Tensor y, string name = null)
+            => tf.Context.ExecuteOp("Sub", name, new ExecuteOpArgs(x, y));
 
         public static Tensor sub<Tx, Ty>(Tx x, Ty y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Sub", name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Sub", name, new ExecuteOpArgs(x, y));
 
         /// <summary>
         /// Returns the truth value of (x == y) element-wise.
@@ -483,11 +431,7 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <returns></returns>
         public static Tensor equal<Tx, Ty>(Tx x, Ty y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Equal", name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Equal", name, new ExecuteOpArgs(x, y));
 
         /// <summary>
         /// Returns the truth value of (x != y) element-wise.
@@ -499,61 +443,32 @@ namespace Tensorflow
         /// <param name="name">The name.</param>
         /// <returns></returns>
         public static Tensor not_equal<Tx, Ty>(Tx x, Ty y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("NotEqual", name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
-
+            => tf.Context.ExecuteOp("NotEqual", name, new ExecuteOpArgs(x, y));
 
         public static Tensor atan2(Tensor y, Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Atan2", name, args: new { y, x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Atan2", name, new ExecuteOpArgs(y, x));
 
         public static Tensor mul<Tx, Ty>(Tx x, Ty y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Mul", name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Mul", name, new ExecuteOpArgs(x, y));
 
         public static Tensor mul_no_nan<Tx, Ty>(Tx x, Ty y, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("MulNoNan", name, args: new { x, y });
+            var _op = tf.OpDefLib._apply_op_helper("MulNoNan", name, args: new { x, y });
 
             return _op.outputs[0];
         }
 
         public static Tensor real_div(Tensor x, Tensor y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("RealDiv", name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("RealDiv", name, new ExecuteOpArgs(x, y));
 
         public static Tensor reciprocal(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Reciprocal", name, args: new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Reciprocal", name, new ExecuteOpArgs(x));
 
         public static Tensor floor_mod(Tensor x, Tensor y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("FloorMod", name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("FloorMod", name, new ExecuteOpArgs(x, y));
 
         public static Tensor floor_div(Tensor x, Tensor y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("FloorDiv", name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("FloorDiv", name, new ExecuteOpArgs(x, y));
 
         /// <summary>
         /// Multiply the matrix "a" by the matrix "b".
@@ -565,46 +480,12 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <returns></returns>
         public static Tensor mat_mul(Tensor a, Tensor b, bool transpose_a = false, bool transpose_b = false, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("MatMul", name, args: new { a, b, transpose_a, transpose_b });
-
-            return _op.output;
-        }
-
-        /// <summary>
-        /// Multiply slices of the two matrices "x" and "y".
-        /// </summary>
-        /// <remarks>
-        /// The `BatchMatMul` operation is embedded into the
-        /// `MatMul` operation on the DLL side. However the expected
-        /// attributes are not the same, hence we need to expose this
-        /// method to have the right args list on the `_apply_op_helper`
-        /// function.
-        ///
-        /// For each rank > 2 the first rank - 2 dimensions are considered
-        /// as fixed, and have to be consistent across the two matrices. A
-        /// common matrix multiplication is then applied over the residual
-        /// 2 dimensions.
-        ///
-        /// e.g.
-        ///     x is (3, 6, 12); y is (3, 12, 6)
-        ///     batch_matmul(x, y) ==> (3, 6, 6)
-        /// </remarks>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        /// <param name="adj_x"></param>
-        /// <param name="adj_y"></param>
-        /// <param name="name"></param>
-        /// <returns></returns>
-        public static Tensor batch_mat_mul(Tensor x, Tensor y, bool adj_x = false, bool adj_y = false, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper(
-                "BatchMatMul",
-                name,
-                args: new { x, y, adj_x, adj_y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("MatMul", name, new ExecuteOpArgs(a, b)
+                .SetAttributes(new
+                {
+                    transpose_a,
+                    transpose_b
+                }));
 
         /// <summary>
         /// Returns the max of x and y (i.e. x > y ? x : y) element-wise.
@@ -614,59 +495,67 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <returns></returns>
         public static Tensor maximum<T1, T2>(T1 x, T2 y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Maximum", name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Maximum", name, new ExecuteOpArgs(x, y));
 
         public static Tensor minimum<T1, T2>(T1 x, T2 y, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Minimum", name, args: new { x, y });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Minimum", name, new ExecuteOpArgs(x, y));
 
         public static Tensor _abs(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Abs", name, args: new { x });
-
-            return _op.output;
-        }
+            => tf.Context.ExecuteOp("Abs", name, new ExecuteOpArgs(x));
 
         public static Tensor _any<Tx, Ty>(Tx input, Ty axis, bool keep_dims = false, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Any", name, new { input, reduction_indices = axis, keep_dims });
+            var _op = tf.OpDefLib._apply_op_helper("Any", name, new { input, reduction_indices = axis, keep_dims });
 
             return _op.outputs[0];
         }
 
-        public static Tensor _max<Tx, Ty>(Tx input, Ty axis, bool keep_dims=false, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Max", name, new { input, reduction_indices = axis, keep_dims });
-
-            return _op.outputs[0];
-        }
+        public static Tensor _max<Tx, Ty>(Tx input, Ty axis, bool keep_dims = false, string name = null)
+            => tf.Context.ExecuteOp("Max", name, new ExecuteOpArgs(input, axis)
+            {
+                GetGradientAttrs = (op) => new
+                {
+                    T = op.get_attr<TF_DataType>("T"),
+                    align_corners = op.get_attr<bool>("align_corners"),
+                    half_pixel_centers = op.get_attr<bool>("half_pixel_centers")
+                }
+            }.SetAttributes(new { keep_dims, reduction_indices = axis }));
 
         public static Tensor _min<Tx, Ty>(Tx input, Ty axis, bool keep_dims = false, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Min", name, new { input, reduction_indices = axis, keep_dims });
+            var _op = tf.OpDefLib._apply_op_helper("Min", name, new { input, reduction_indices = axis, keep_dims });
 
             return _op.outputs[0];
         }
 
         public static Tensor pow<Tx, Ty>(Tx x, Ty y, string name = null)
+            => tf.Context.ExecuteOp("Pow", name, new ExecuteOpArgs(x, y));
+
+        public static Tensor _sum<Tx, Ty>(Tx input, Ty axis = default, bool keep_dims = false, string name = null)
+            => tf.Context.ExecuteOp("Sum", name, 
+                new ExecuteOpArgs(input, axis).SetAttributes(new { keep_dims, reduction_indices = axis }));
+
+        public static Tensor _sum(Tensor[] inputs, Tensor axis = default, bool keep_dims = false, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Pow", name, args: new { x, y });
+            if (tf.Context.executing_eagerly())
+            {
+                return _sum_eager_fallback(inputs, axis,
+                        keep_dims: keep_dims, name: name, ctx: tf.Context);
+            }
+
+            var _op = tf.OpDefLib._apply_op_helper("Sum", name, args: new { inputs, reduction_indices = axis, keep_dims });
 
             return _op.outputs[0];
         }
 
-        public static Tensor _sum<Tx, Ty>(Tx input, Ty axis = default, bool keep_dims = false, string name = null)
+        private static Tensor _sum_eager_fallback(Tensor[] inputs, Tensor axis, bool keep_dims = false, string name = null, Context ctx = null)
         {
-            var _op = _op_def_lib._apply_op_helper("Sum", name, args: new { input, reduction_indices = axis, keep_dims });
+            var (_attr_T, input) = tf.Runner.ArgsToMatchingEager(ctx, args: new[] { inputs });
+            var (_attr_Tidx, axis1) = tf.Runner.ArgsToMatchingEager(ctx, tf.int32, new[] { axis });
+            var _inputs_flat = input.concat(axis1);
+            var _attrs = new object[] { "keep_dims", keep_dims, "T", _attr_T, "Tidx", _attr_Tidx };
 
-            return _op.outputs[0];
+            return tf.Runner.Execute(ctx, "Sum", 1, _inputs_flat, _attrs, name: name)[0];
         }
 
         /// <summary>
@@ -678,11 +567,7 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <returns></returns>
         public static Tensor range(Tensor start, Tensor limit, Tensor delta, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Range", name, new { start, limit, delta });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Range", name, new ExecuteOpArgs(start, limit, delta));
 
         /// <summary>
         ///    Rounds the values of a tensor to the nearest integer, element-wise.
@@ -701,7 +586,7 @@ namespace Tensorflow
         /// </remarks>
         public static Tensor round(Tensor x, string name = "Round")
         {
-            var op = _op_def_lib._apply_op_helper("Round", name: name, new { x });
+            var op = tf.OpDefLib._apply_op_helper("Round", name: name, new { x });
 
             return op.output;
         }
@@ -713,11 +598,7 @@ namespace Tensorflow
         /// <param name="name"></param>
         /// <returns></returns>
         public static Tensor rsqrt(Tensor x, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Rsqrt", name, new { x });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Rsqrt", name, new ExecuteOpArgs(x));
 
         /// <summary>
         /// Returns the fraction of zeros in value.
@@ -726,10 +607,6 @@ namespace Tensorflow
         /// <param name="name">A name for the operation (optional).</param>
         /// <returns>The fraction of zeros in value, with type float32.</returns>
         public static Tensor zero_fraction(Tensor value, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("zero_fraction", name, new { value, name });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("zero_fraction", name, new ExecuteOpArgs(value));
     }
 }

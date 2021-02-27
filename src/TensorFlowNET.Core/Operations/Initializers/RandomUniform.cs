@@ -18,33 +18,32 @@ namespace Tensorflow.Operations.Initializers
 {
     public class RandomUniform : IInitializer
     {
+#pragma warning disable CS0649 // Field 'RandomUniform.seed' is never assigned to, and will always have its default value
         private int? seed;
+#pragma warning restore CS0649 // Field 'RandomUniform.seed' is never assigned to, and will always have its default value
+#pragma warning disable CS0649 // Field 'RandomUniform.minval' is never assigned to, and will always have its default value 0
         private float minval;
+#pragma warning restore CS0649 // Field 'RandomUniform.minval' is never assigned to, and will always have its default value 0
+#pragma warning disable CS0649 // Field 'RandomUniform.maxval' is never assigned to, and will always have its default value 0
         private float maxval;
+#pragma warning restore CS0649 // Field 'RandomUniform.maxval' is never assigned to, and will always have its default value 0
         private TF_DataType dtype;
 
-        public RandomUniform()
+        public RandomUniform(TF_DataType dtype = TF_DataType.TF_FLOAT)
         {
-
+            this.dtype = dtype;
         }
 
-        public Tensor call(TensorShape shape, TF_DataType dtype = TF_DataType.DtInvalid, bool? verify_shape = null)
+        public Tensor Apply(InitializerArgs args)
         {
-            return random_ops.random_uniform(shape, 
-                minval: minval, 
-                maxval: maxval, 
-                dtype: dtype, 
+            if (args.DType == TF_DataType.DtInvalid)
+                args.DType = dtype;
+
+            return random_ops.random_uniform(args.Shape,
+                minval: minval,
+                maxval: maxval,
+                dtype: dtype,
                 seed: seed);
-        }
-
-        public object get_config()
-        {
-            return new {
-                minval,
-                maxval,
-                seed,
-                dtype
-            };
         }
     }
 }

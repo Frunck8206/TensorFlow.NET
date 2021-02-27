@@ -81,6 +81,9 @@ namespace Tensorflow
         /// </summary>
         public _ControlDependenciesController control_dependencies(object[] control_inputs)
         {
+            if (tf.Context.executing_eagerly())
+                return new _ControlDependenciesController(this, null);
+
             if (control_inputs == null)
                 return new _ControlDependenciesController(this, null);
 
@@ -93,7 +96,7 @@ namespace Tensorflow
                     //case IndexedSlices islice:
                     //    control_ops.Add(islice.op);
                     //    break;
-                    case Tensor t:                       
+                    case Tensor t:
                         control_ops.Add(t.op);
                         break;
                     case Operation op:
@@ -135,7 +138,7 @@ namespace Tensorflow
 
         public void _pop_control_dependencies_controller(_ControlDependenciesController controller)
         {
-            _control_dependencies_stack.RemoveAt(_control_dependencies_stack.Count-1);
+            _control_dependencies_stack.RemoveAt(_control_dependencies_stack.Count - 1);
         }
 
         /// <summary>

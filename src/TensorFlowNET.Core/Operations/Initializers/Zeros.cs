@@ -18,24 +18,23 @@ namespace Tensorflow.Operations.Initializers
 {
     public class Zeros : IInitializer
     {
-        private TF_DataType dtype;
+        TensorShape shape;
+        TF_DataType dtype;
 
-        public Zeros(TF_DataType dtype = TF_DataType.TF_FLOAT)
+        public Zeros(TensorShape shape = null, TF_DataType dtype = TF_DataType.TF_FLOAT)
         {
+            this.shape = shape;
             this.dtype = dtype;
         }
 
-        public Tensor call(TensorShape shape, TF_DataType dtype = TF_DataType.DtInvalid, bool? verify_shape = null)
+        public Tensor Apply(InitializerArgs args)
         {
-            if (dtype == TF_DataType.DtInvalid)
-                dtype = this.dtype;
+            if (args.DType == TF_DataType.DtInvalid)
+                args.DType = dtype;
+            if (args.Shape == null)
+                args.Shape = shape;
 
-            return array_ops.zeros(shape, dtype);
-        }
-
-        public object get_config()
-        {
-            return new { dtype = dtype.name() };
+            return array_ops.zeros(args.Shape, dtype);
         }
     }
 }

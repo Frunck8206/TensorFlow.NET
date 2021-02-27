@@ -1,16 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using NumSharp;
 using Tensorflow.Framework;
-using Tensorflow.Operations;
 using Tensorflow.Util;
 using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
+#pragma warning disable CS0659 // 'Operation' overrides Object.Equals(object o) but does not override Object.GetHashCode()
     public partial class Operation
+#pragma warning restore CS0659 // 'Operation' overrides Object.Equals(object o) but does not override Object.GetHashCode()
     {
         /// <summary>
         /// map on the list of tensors unpacked from `elems` on dimension 0.
@@ -24,7 +23,7 @@ namespace Tensorflow
         /// <param name="infer_shape"></param>
         /// <param name="name"></param>
         /// <returns>A tensor or (possibly nested) sequence of tensors.</returns>
-        public static Tensor map_fn(Func<Tensor, Tensor> fn, 
+        public static Tensor map_fn(Func<Tensor, Tensor> fn,
             Tensor elems,
             TF_DataType dtype = TF_DataType.DtInvalid,
             int parallel_iterations = 10,
@@ -34,7 +33,7 @@ namespace Tensorflow
             string name = null)
         {
             bool input_is_sequence = nest.is_sequence(elems);
-            Tensor[] input_flatten(Tensor x) => input_is_sequence ? nest.flatten(x).ToArray() : new [] {x};
+            Tensor[] input_flatten(Tensor x) => input_is_sequence ? nest.flatten(x).ToArray() : new[] { x };
             Tensor input_pack(Tensor[] x) => input_is_sequence ? (Tensor)nest.pack_sequence_as(elems, x) : x[0];
 
             bool output_is_sequence;
@@ -49,7 +48,7 @@ namespace Tensorflow
             else
             {
                 output_is_sequence = nest.is_sequence(dtype);
-                output_flatten = (x) => output_is_sequence ? nest.flatten(x).ToArray() : new [] {x};
+                output_flatten = (x) => output_is_sequence ? nest.flatten(x).ToArray() : new[] { x };
                 output_pack = (x) => output_is_sequence ? (Tensor)nest.pack_sequence_as(dtype, x) : x[0];
             }
 
@@ -101,11 +100,11 @@ namespace Tensorflow
 
                 BodyItem compute(BodyItem item)
                 {
-                    var packed_values  = input_pack(elems_ta.Select(elem_ta => elem_ta.read(item.I)).ToArray());
+                    var packed_values = input_pack(elems_ta.Select(elem_ta => elem_ta.read(item.I)).ToArray());
                     var packed_fn_values = fn(packed_values);
                     //nest.assert_same_structure(dtype or elems, packed_fn_values)
 
-                    var flat_fn_values  = output_flatten(packed_fn_values);
+                    var flat_fn_values = output_flatten(packed_fn_values);
                     for (int j = 0; j < item.Accs_ta.Length; j++)
                     {
                         item.Accs_ta[j].write(item.I, flat_fn_values[j]);
@@ -115,8 +114,8 @@ namespace Tensorflow
                 }
 
                 var r_a = control_flow_ops.while_loop(
-                    (x) => x.I < n, 
-                    compute, 
+                    (x) => x.I < n,
+                    compute,
                     new BodyItem(i, accs_ta),
                     parallel_iterations: parallel_iterations,
                     back_prop: back_prop,
@@ -125,7 +124,7 @@ namespace Tensorflow
                 var results_flat = r_a.Accs_ta.Select(r => r.stack()).ToArray();
 
                 var n_static = new Dimension(tensor_shape.dimension_value(elems_flat[0].TensorShape.with_rank_at_least(1).dims[0]));
-                
+
                 foreach (var elem in elems_flat.Skip(1))
                 {
                     n_static.merge_with(new Dimension(tensor_shape.dimension_value(elem.TensorShape.with_rank_at_least(1).dims[0])));
@@ -170,15 +169,15 @@ namespace Tensorflow
             public BodyItem Pack(object[] sequences)
             {
                 I = sequences[0] as Tensor;
-                Accs_ta = new [] { sequences[1] as TensorArray };
-                
+                Accs_ta = new[] { sequences[1] as TensorArray };
+
                 return new BodyItem(I, Accs_ta);
             }
 
             public BodyItem FromMergeVars(ITensorOrTensorArray[] merge_vars)
             {
                 I = (Tensor)merge_vars[1];
-                Accs_ta = new [] {(TensorArray) merge_vars[2]};
+                Accs_ta = new[] { (TensorArray)merge_vars[2] };
                 return this;
             }
         }

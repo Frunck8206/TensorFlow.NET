@@ -37,12 +37,12 @@ namespace Tensorflow
         /// </summary>
         /// <param name="scope"></param>
         /// <returns></returns>
-        public static VariableV1[] _all_saveable_objects(string scope = "")
+        public static IVariableV1[] _all_saveable_objects(string scope = "")
         {
-            var all = new List<VariableV1>();
+            var all = new List<IVariableV1>();
 
-            all.AddRange(ops.get_collection<VariableV1>(tf.GraphKeys.GLOBAL_VARIABLES, scope));
-            all.AddRange(ops.get_collection<VariableV1>(tf.GraphKeys.SAVEABLE_OBJECTS, scope));
+            all.AddRange(ops.get_collection<IVariableV1>(tf.GraphKeys.GLOBAL_VARIABLES, scope));
+            all.AddRange(ops.get_collection<IVariableV1>(tf.GraphKeys.SAVEABLE_OBJECTS, scope));
 
             return all.ToArray();
         }
@@ -58,9 +58,9 @@ namespace Tensorflow
         /// special tokens filters by prefix.
         /// </param>
         /// <returns>A list of `Variable` objects.</returns>
-        public static List<VariableV1> global_variables(string scope = null)
+        public static List<IVariableV1> global_variables(string scope = null)
         {
-            return ops.get_collection<VariableV1>(tf.GraphKeys.GLOBAL_VARIABLES, scope);
+            return ops.get_collection<IVariableV1>(tf.GraphKeys.GLOBAL_VARIABLES, scope);
         }
 
         /// <summary>
@@ -69,10 +69,10 @@ namespace Tensorflow
         /// <param name="var_list">List of `Variable` objects to initialize.</param>
         /// <param name="name">Optional name for the returned operation.</param>
         /// <returns>An Op that run the initializers of all the specified variables.</returns>
-        public static Operation variables_initializer(VariableV1[] var_list, string name = "init")
+        public static Operation variables_initializer(IVariableV1[] var_list, string name = "init")
         {
             if (var_list.Length > 0)
-                return control_flow_ops.group(var_list.Select(x => x.initializer).ToArray(), name);
+                return control_flow_ops.group(var_list.Select(x => x.Initializer).ToArray(), name);
             else
                 return gen_control_flow_ops.no_op(name: name);
         }
@@ -86,7 +86,7 @@ namespace Tensorflow
         {
             var op = tensor.op;
             Operation new_op = op_cache.ContainsKey(op.name) ? op_cache[op.name] : null;
-            if(new_op == null)
+            if (new_op == null)
             {
                 new_op = _safe_initial_value_from_op(name, op, op_cache);
                 op_cache[op.name] = new_op;
@@ -110,7 +110,7 @@ namespace Tensorflow
                 op_type == "ReadVariableOp")
                 return op;
 
-            if(op_type == "Variable" ||
+            if (op_type == "Variable" ||
                 op_type == "VariableV2" ||
                 op_type == "VarHandleOp")
             {
@@ -120,7 +120,7 @@ namespace Tensorflow
             // Recursively build initializer expressions for inputs.
             bool modified = false;
             var new_op_inputs = new List<Tensor>();
-            foreach(Tensor op_input in op.inputs)
+            foreach (Tensor op_input in op.inputs)
             {
                 var new_op_input = _safe_initial_value_from_tensor(name, op_input, op_cache);
                 new_op_inputs.Add(new_op_input);
@@ -128,7 +128,7 @@ namespace Tensorflow
             }
 
             // If at least one input was modified, replace the op.
-            if(modified)
+            if (modified)
             {
                 var new_op_type = op_type;
                 if (new_op_type == "RefSwitch")
@@ -143,10 +143,10 @@ namespace Tensorflow
                     attr_protos[attr_def.Key] = attr_def.Value;
 
                 return op.graph.create_op(
-                    new_op_type, 
+                    new_op_type,
                     new_op_inputs.ToArray(),
                     _output_types,
-                    name: new_op_name, 
+                    name: new_op_name,
                     attrs: attr_protos);
             }
 

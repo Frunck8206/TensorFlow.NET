@@ -1,13 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 using static Tensorflow.Binding;
 
 namespace Tensorflow.Train
 {
     public class TrainingUtil
     {
-        public static RefVariable create_global_step(Graph graph = null)
+        public static IVariableV1 create_global_step(Graph graph = null)
         {
             graph = graph ?? ops.get_default_graph();
             if (get_global_step(graph) != null)
@@ -16,7 +14,7 @@ namespace Tensorflow.Train
             // Create in proper graph and base name_scope.
             var g = graph.as_default();
             g.name_scope(null);
-            var v = tf.get_variable(tf.GraphKeys.GLOBAL_STEP, new int[0], dtype: dtypes.int64,
+            var v = tf.compat.v1.get_variable(tf.GraphKeys.GLOBAL_STEP, new int[0], dtype: dtypes.int64,
                 initializer: tf.zeros_initializer,
                 trainable: false,
                 aggregation: VariableAggregation.OnlyFirstReplica,
@@ -44,7 +42,7 @@ namespace Tensorflow.Train
                     return null;
                 }
             }
-                
+
             return global_step_tensor;
         }
 
@@ -62,7 +60,7 @@ namespace Tensorflow.Train
 
             var g = graph.as_default();
             g.name_scope(null);
-            g.name_scope(global_step_tensor.op.name + "/");
+            g.name_scope(global_step_tensor.Op.name + "/");
             // using initialized_value to ensure that global_step is initialized before
             // this run. This is needed for example Estimator makes all model_fn build
             // under global_step_read_tensor dependency.

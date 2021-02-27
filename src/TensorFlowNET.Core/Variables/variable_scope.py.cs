@@ -16,6 +16,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace Tensorflow
@@ -23,11 +24,11 @@ namespace Tensorflow
     /// <summary>
     /// A context manager for defining ops that creates variables (layers).
     /// </summary>
-    public class variable_scope : IObjectLife
+    public class variable_scope : ITensorFlowObject
     {
         public static string _VARSTORE_KEY = "__variable_store";
         public static string _VARSCOPESTORE_KEY = "__varscope";
-        public static bool _DEFAULT_USE_RESOURCE = false;
+        public static bool _DEFAULT_USE_RESOURCE = true;
 
         private bool _use_resource;
         public bool UseResource => _use_resource;
@@ -172,7 +173,7 @@ namespace Tensorflow
             return $"{prefix}_{idx}";
         }
 
-        public static VariableV1 default_variable_creator(object initial_value,
+        public static IVariableV1 default_variable_creator(object initial_value,
             string name = null,
             bool? trainable = null,
             List<string> collections = null,
@@ -280,6 +281,7 @@ namespace Tensorflow
             return scope._scope;
         }
 
+        [DebuggerHidden]
         public void __exit__()
         {
             _cached_pure_variable_scope.__exit__();
@@ -287,6 +289,7 @@ namespace Tensorflow
                 _current_name_scope.__exit__();
         }
 
+        [DebuggerHidden]
         public void Dispose()
         {
             if (_current_name_scope != null)

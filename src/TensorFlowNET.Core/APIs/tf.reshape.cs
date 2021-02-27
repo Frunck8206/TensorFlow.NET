@@ -18,12 +18,19 @@ namespace Tensorflow
 {
     public partial class tensorflow
     {
-        public Tensor reshape<T1, T2>(T1 tensor,
-                T2 shape,
-                string name = null) => gen_array_ops.reshape(tensor, shape, name);
+        public Tensor reshape(Tensor tensor,
+                TensorShape shape,
+                string name = null) 
+            => gen_array_ops.reshape(tensor, shape, name);
 
         public Tensor reshape(Tensor tensor,
-                int[] shape,
-                string name = null) => gen_array_ops.reshape(tensor, shape, name);
+                Tensor shape,
+                string name = null) 
+            => gen_array_ops.reshape(tensor, shape, name);
+
+        public Tensor reshape(Tensor tensor,
+                object[] shape,
+                string name = null)
+            => gen_array_ops.reshape(tensor, shape, name);
     }
 }

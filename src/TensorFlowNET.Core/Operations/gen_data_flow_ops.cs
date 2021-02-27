@@ -14,24 +14,24 @@
    limitations under the License.
 ******************************************************************************/
 
+using static Tensorflow.Binding;
+
 namespace Tensorflow
 {
     public class gen_data_flow_ops
     {
-        public static OpDefLibrary _op_def_lib = new OpDefLibrary();
-
         public static Tensor dynamic_stitch(Tensor[] indices, Tensor[] data, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("DynamicStitch", name, new { indices, data });
+            var _op = tf.OpDefLib._apply_op_helper("DynamicStitch", name, new { indices, data });
 
             return _op.output;
         }
 
-        public static Tensor[] dynamic_partition(Tensor data, Tensor partitions, int num_partitions, 
+        public static Tensor[] dynamic_partition(Tensor data, Tensor partitions, int num_partitions,
             string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("DynamicPartition", name, new 
-            { 
+            var _op = tf.OpDefLib._apply_op_helper("DynamicPartition", name, new
+            {
                 data,
                 partitions,
                 num_partitions
@@ -40,11 +40,11 @@ namespace Tensorflow
             return _op.outputs;
         }
 
-        public static (Tensor, Tensor) tensor_array_v3<T>(T size, TF_DataType dtype = TF_DataType.DtInvalid, 
-            TensorShape element_shape = null, bool dynamic_size = false, bool clear_after_read = true, 
+        public static (Tensor, Tensor) tensor_array_v3<T>(T size, TF_DataType dtype = TF_DataType.DtInvalid,
+            TensorShape element_shape = null, bool dynamic_size = false, bool clear_after_read = true,
             bool identical_element_shapes = false, string tensor_array_name = "", string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("TensorArrayV3", name, new
+            var _op = tf.OpDefLib._apply_op_helper("TensorArrayV3", name, new
             {
                 size,
                 dtype,
@@ -58,10 +58,10 @@ namespace Tensorflow
             return (_op.outputs[0], _op.outputs[1]);
         }
 
-        public static Tensor tensor_array_scatter_v3(Tensor handle, Tensor indices, Tensor value, 
+        public static Tensor tensor_array_scatter_v3(Tensor handle, Tensor indices, Tensor value,
             Tensor flow_in, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("TensorArrayScatterV3", name, new
+            var _op = tf.OpDefLib._apply_op_helper("TensorArrayScatterV3", name, new
             {
                 handle,
                 indices,
@@ -72,11 +72,11 @@ namespace Tensorflow
             return _op.output;
         }
 
-        public static Tensor padding_fifo_queue_v2(TF_DataType[] component_types, TensorShape[] shapes, 
-            int capacity = -1, string container = "", string shared_name = "", 
+        public static Tensor padding_fifo_queue_v2(TF_DataType[] component_types, TensorShape[] shapes,
+            int capacity = -1, string container = "", string shared_name = "",
             string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("PaddingFIFOQueueV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("PaddingFIFOQueueV2", name, new
             {
                 component_types,
                 shapes,
@@ -92,7 +92,7 @@ namespace Tensorflow
             int capacity = -1, string container = "", string shared_name = "",
             string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("FIFOQueueV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("FIFOQueueV2", name, new
             {
                 component_types,
                 shapes,
@@ -108,7 +108,7 @@ namespace Tensorflow
             int capacity = -1, string container = "", string shared_name = "",
             string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("PriorityQueueV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("PriorityQueueV2", name, new
             {
                 component_types,
                 shapes,
@@ -124,7 +124,7 @@ namespace Tensorflow
             int capacity = -1, int min_after_dequeue = 0, int seed = 0, int seed2 = 0,
             string container = "", string shared_name = "", string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("RandomShuffleQueueV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("RandomShuffleQueueV2", name, new
             {
                 component_types,
                 shapes,
@@ -141,7 +141,7 @@ namespace Tensorflow
 
         public static Operation queue_enqueue(Tensor handle, Tensor[] components, int timeout_ms = -1, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("QueueEnqueue", name, new
+            var _op = tf.OpDefLib._apply_op_helper("QueueEnqueue", name, new
             {
                 handle,
                 components,
@@ -153,7 +153,7 @@ namespace Tensorflow
 
         public static Operation queue_enqueue_v2(Tensor handle, Tensor[] components, int timeout_ms = -1, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("QueueEnqueueV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("QueueEnqueueV2", name, new
             {
                 handle,
                 components,
@@ -165,7 +165,7 @@ namespace Tensorflow
 
         public static Tensor[] queue_dequeue_v2(Tensor handle, TF_DataType[] component_types, int timeout_ms = -1, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("QueueDequeueV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("QueueDequeueV2", name, new
             {
                 handle,
                 component_types,
@@ -177,7 +177,7 @@ namespace Tensorflow
 
         public static Tensor[] queue_dequeue(Tensor handle, TF_DataType[] component_types, int timeout_ms = -1, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("QueueDequeue", name, new
+            var _op = tf.OpDefLib._apply_op_helper("QueueDequeue", name, new
             {
                 handle,
                 component_types,
@@ -189,7 +189,7 @@ namespace Tensorflow
 
         public static Operation queue_enqueue_many_v2(Tensor handle, Tensor[] components, int timeout_ms = -1, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("QueueEnqueueManyV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("QueueEnqueueManyV2", name, new
             {
                 handle,
                 components,
@@ -201,7 +201,7 @@ namespace Tensorflow
 
         public static Tensor[] queue_dequeue_many_v2(Tensor handle, int n, TF_DataType[] component_types, int timeout_ms = -1, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("QueueDequeueManyV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("QueueDequeueManyV2", name, new
             {
                 handle,
                 n,
@@ -223,7 +223,7 @@ namespace Tensorflow
         /// <returns></returns>
         public static Tensor tensor_array_read_v3(Tensor handle, Tensor index, Tensor flow_in, TF_DataType dtype, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("TensorArrayReadV3", name, new
+            var _op = tf.OpDefLib._apply_op_helper("TensorArrayReadV3", name, new
             {
                 handle,
                 index,
@@ -236,7 +236,7 @@ namespace Tensorflow
 
         public static Tensor tensor_array_write_v3(Tensor handle, Tensor index, Tensor value, Tensor flow_in, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("TensorArrayWriteV3", name, new
+            var _op = tf.OpDefLib._apply_op_helper("TensorArrayWriteV3", name, new
             {
                 handle,
                 index,
@@ -249,7 +249,7 @@ namespace Tensorflow
 
         public static Tensor tensor_array_size_v3(Tensor handle, Tensor flow_in, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("TensorArraySizeV3", name, new
+            var _op = tf.OpDefLib._apply_op_helper("TensorArraySizeV3", name, new
             {
                 handle,
                 flow_in
@@ -258,10 +258,10 @@ namespace Tensorflow
             return _op.output;
         }
 
-        public static Tensor tensor_array_gather_v3(Tensor handle, Tensor indices, Tensor flow_in, 
+        public static Tensor tensor_array_gather_v3(Tensor handle, Tensor indices, Tensor flow_in,
             TF_DataType dtype, TensorShape element_shape = null, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("TensorArrayGatherV3", name, new
+            var _op = tf.OpDefLib._apply_op_helper("TensorArrayGatherV3", name, new
             {
                 handle,
                 indices,
@@ -273,10 +273,10 @@ namespace Tensorflow
             return _op.output;
         }
 
-        public static Tensor stack_v2(Tensor max_size, TF_DataType elem_type, string stack_name = "", 
+        public static Tensor stack_v2(Tensor max_size, TF_DataType elem_type, string stack_name = "",
             string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("StackV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("StackV2", name, new
             {
                 max_size,
                 elem_type,
@@ -286,10 +286,10 @@ namespace Tensorflow
             return _op.output;
         }
 
-        public static Tensor stack_push_v2(Tensor handle, Tensor elem, bool swap_memory = false, 
+        public static Tensor stack_push_v2(Tensor handle, Tensor elem, bool swap_memory = false,
             string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("StackPushV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("StackPushV2", name, new
             {
                 handle,
                 elem,
@@ -301,7 +301,7 @@ namespace Tensorflow
 
         public static Tensor stack_pop_v2(Tensor handle, TF_DataType elem_type, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("StackPopV2", name, new
+            var _op = tf.OpDefLib._apply_op_helper("StackPopV2", name, new
             {
                 handle,
                 elem_type

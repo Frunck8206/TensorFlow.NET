@@ -14,15 +14,12 @@
    limitations under the License.
 ******************************************************************************/
 
-using System.Collections.Generic;
-using Tensorflow.Framework;
+using static Tensorflow.Binding;
 
 namespace Tensorflow
 {
     public class gen_sparse_ops
     {
-        public static OpDefLibrary _op_def_lib = new OpDefLibrary();
-
         /// <summary>
         /// Converts a sparse representation into a dense tensor.
         /// </summary>
@@ -33,14 +30,14 @@ namespace Tensorflow
         /// <param name="validate_indices"></param>
         /// <param name="name"></param>
         /// <returns></returns>
-        public static Tensor sparse_to_dense<T>(Tensor sparse_indices, 
-            int[] output_shape, 
+        public static Tensor sparse_to_dense<T>(Tensor sparse_indices,
+            int[] output_shape,
             T sparse_values,
             T default_value,
             bool validate_indices = true,
             string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("SparseToDense", name, args: new
+            var _op = tf.OpDefLib._apply_op_helper("SparseToDense", name, args: new
             {
                 sparse_indices,
                 output_shape,
@@ -59,7 +56,7 @@ namespace Tensorflow
             bool validate_indices = true,
             string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("SparseToDense", name, args: new
+            var _op = tf.OpDefLib._apply_op_helper("SparseToDense", name, args: new
             {
                 sparse_indices,
                 output_shape,

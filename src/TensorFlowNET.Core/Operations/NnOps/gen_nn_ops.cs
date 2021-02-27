@@ -14,14 +14,13 @@
    limitations under the License.
 ******************************************************************************/
 
+using System.Linq;
 using static Tensorflow.Binding;
 
 namespace Tensorflow.Operations
 {
     public class gen_nn_ops
     {
-        public static OpDefLibrary _op_def_lib = new OpDefLibrary();
-
         /// <summary>
         /// Computes a 2-D convolution given 4-D `input` and `filter` tensors.
         /// 
@@ -41,101 +40,73 @@ namespace Tensorflow.Operations
         /// <param name="parameters"></param>
         /// <returns></returns>
         public static Tensor conv2d(Conv2dParams parameters)
-        {
-            var _op = _op_def_lib._apply_op_helper("Conv2D", name: parameters.Name, args: new
-            {
-                input = parameters.Input,
-                filter = parameters.Filter,
-                strides = parameters.Strides,
-                padding = parameters.Padding,
-                use_cudnn_on_gpu = parameters.UseCudnnOnGpu,
-                explicit_paddings = parameters.ExplicitPaddings,
-                data_format = parameters.DataFormat,
-                dilations = parameters.Dilations
-            });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Conv2D", parameters.Name, new ExecuteOpArgs(parameters.Input, parameters.Filter)
+                .SetAttributes(new
+                {
+                    strides = parameters.Strides,
+                    padding = parameters.Padding,
+                    use_cudnn_on_gpu = parameters.UseCudnnOnGpu,
+                    explicit_paddings = parameters.ExplicitPaddings,
+                    data_format = parameters.DataFormat,
+                    dilations = parameters.Dilations
+                }));
 
         /// <summary>
         /// Computes the gradients of convolution with respect to the filter.
         /// </summary>
         /// <param name="parameters"></param>
         /// <returns></returns>
-        public static Tensor conv2d_backprop_filter(Conv2dParams parameters)
-        {
-            var _op = _op_def_lib._apply_op_helper("Conv2DBackpropFilter", name: parameters.Name, args: new
-            {
-                input = parameters.Input,
-                filter_sizes = parameters.FilterSizes,
-                out_backprop = parameters.OutBackProp,
-                strides = parameters.Strides,
-                padding = parameters.Padding,
-                use_cudnn_on_gpu = parameters.UseCudnnOnGpu,
-                explicit_paddings = parameters.ExplicitPaddings,
-                data_format = parameters.DataFormat,
-                dilations = parameters.Dilations
-            });
-
-            return _op.outputs[0];
-        }
+        public static Tensor conv2d_backprop_filter(Tensor input, Tensor filter_sizes, Tensor out_backprop,
+            int[] strides, string padding, bool use_cudnn_on_gpu = true,
+            int[] explicit_paddings = null,
+            string data_format = "NHWC",
+            int[] dilations = null,
+            string name = null)
+                => tf.Context.ExecuteOp("Conv2DBackpropFilter", name, new ExecuteOpArgs(input, filter_sizes, out_backprop)
+                    .SetAttributes(new
+                    {
+                        strides,
+                        padding,
+                        use_cudnn_on_gpu,
+                        explicit_paddings = explicit_paddings ?? new int[0],
+                        data_format,
+                        dilations = dilations ?? new int[] { 1, 1, 1, 1 }
+                    }));
 
         /// <summary>
         /// Computes the gradients of convolution with respect to the input.
         /// </summary>
         /// <param name="parameters"></param>
         /// <returns></returns>
-        public static Tensor conv2d_backprop_input(Conv2dParams parameters)
-        {
-            var _op = _op_def_lib._apply_op_helper("Conv2DBackpropInput", name: parameters.Name, args: new
-            {
-                input_sizes = parameters.InputSizes,
-                filter = parameters.Filter,
-                out_backprop = parameters.OutBackProp,
-                strides = parameters.Strides,
-                padding = parameters.Padding,
-                use_cudnn_on_gpu = parameters.UseCudnnOnGpu,
-                explicit_paddings = parameters.ExplicitPaddings,
-                data_format = parameters.DataFormat,
-                dilations = parameters.Dilations
-            });
-
-            return _op.outputs[0];
-        }
+        public static Tensor conv2d_backprop_input(Tensor input_sizes, Tensor filter, Tensor out_backprop,
+            int[] strides, string padding, bool use_cudnn_on_gpu = true,
+            int[] explicit_paddings = null,
+            string data_format = "NHWC",
+            int[] dilations = null,
+            string name = null)
+                => tf.Context.ExecuteOp("Conv2DBackpropInput", name, new ExecuteOpArgs(input_sizes, filter, out_backprop)
+                    .SetAttributes(new
+                    {
+                        strides,
+                        padding,
+                        use_cudnn_on_gpu,
+                        explicit_paddings = explicit_paddings ?? new int[0],
+                        data_format,
+                        dilations = dilations ?? new int[] { 1, 1, 1, 1 }
+                    }));
 
         public static Tensor bias_add(Tensor value,
-            Tensor bias,
+            IVariableV1 bias,
             string data_format = null,
             string name = null)
-        {
-            if (data_format == null)
-                data_format = "NHWC";
-
-            var _op = _op_def_lib._apply_op_helper("BiasAdd", name: name, args: new
-            {
-                value,
-                bias,
-                data_format
-            });
-
-            return _op.outputs[0];
-        }
+                => tf.Context.ExecuteOp("BiasAdd", name, new ExecuteOpArgs(value, bias)
+                    .SetAttributes(new { data_format = data_format ?? "NHWC" }));
 
         public static Tensor bias_add_grad(Tensor out_backprop,
             string data_format = "NHWC",
             string name = null)
-        {
-            if (data_format == null)
-                data_format = "NHWC";
-
-            var _op = _op_def_lib._apply_op_helper("BiasAddGrad", name: name, args: new
-            {
-                out_backprop,
-                data_format
-            });
-
-            return _op.outputs[0];
-        }
+                => tf.Context.ExecuteOp("BiasAddGrad", name, new ExecuteOpArgs(out_backprop)
+                    .SetAttributes(new { data_format = data_format ?? "NHWC" }));
 
         /// <summary>
         /// Computes exponential linear: <c>exp(features) - 1</c> if &amp;lt; 0, <c>features</c> otherwise.
@@ -154,26 +125,18 @@ namespace Tensorflow.Operations
         /// </remarks>
         public static Tensor elu(Tensor features, string name = "Elu")
         {
-            var op = _op_def_lib._apply_op_helper("Elu", name: name, args: new { features });
+            var op = tf.OpDefLib._apply_op_helper("Elu", name: name, args: new { features });
             return op.output;
         }
 
         /// <summary>
         /// Gradient for batch normalization.
         /// </summary>
-        /// <param name="y_backprop"></param>
-        /// <param name="x"></param>
-        /// <param name="scale"></param>
-        /// <param name="reserve_space_1"></param>
-        /// <param name="reserve_space_2"></param>
-        /// <param name="epsilon"></param>
-        /// <param name="data_format"></param>
-        /// <param name="is_training"></param>
-        /// <param name="name"></param>
+        /// <param name="params"></param>
         /// <returns></returns>
         public static Tensor[] fused_batch_norm_grad(FusedBatchNormParams @params)
         {
-            var op = _op_def_lib._apply_op_helper("FusedBatchNormGrad", name: @params.Name, args: new
+            var op = tf.OpDefLib._apply_op_helper("FusedBatchNormGrad", name: @params.Name, args: new
             {
                 y_backprop = @params.YBackprop,
                 x = @params.X,
@@ -187,6 +150,21 @@ namespace Tensorflow.Operations
             return op.outputs;
         }
 
+        public static Tensor[] fused_batch_norm_grad_v3(FusedBatchNormParams @params)
+            => tf.Context.ExecuteOp("FusedBatchNormGradV3", @params.Name,
+                new ExecuteOpArgs(@params.YBackprop,
+                    @params.X,
+                    @params.Scale,
+                    @params.ReserveSpace1,
+                    @params.ReserveSpace2,
+                    @params.ReserveSpace3)
+                .SetAttributes(new
+                {
+                    epsilon = @params.Epsilon,
+                    data_format = @params.DataFormat,
+                    is_training = @params.IsTraining
+                }));
+
         public static Tensor[] fused_batch_norm(Tensor x,
                 Tensor scale,
                 Tensor offset,
@@ -197,7 +175,7 @@ namespace Tensorflow.Operations
                 bool is_training = true,
                 string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("FusedBatchNorm", name: name, args: new
+            var _op = tf.OpDefLib._apply_op_helper("FusedBatchNorm", name: name, args: new
             {
                 x,
                 scale,
@@ -212,6 +190,19 @@ namespace Tensorflow.Operations
             return _op.outputs;
         }
 
+        public static Tensors fused_batch_norm_v3(Tensor x,
+            IVariableV1 scale,
+            IVariableV1 offset,
+            IVariableV1 mean,
+            IVariableV1 variance,
+            float epsilon = 0.0001f,
+            float exponential_avg_factor = 1.0f,
+            string data_format = "NHWC",
+            bool is_training = true,
+            string name = null)
+                => tf.Context.ExecuteOp("FusedBatchNormV3", name, new ExecuteOpArgs(x, scale, offset, mean, variance)
+                    .SetAttributes(new { epsilon, data_format, is_training }));
+
         /// <summary>
         /// Local Response Normalization.
         /// </summary>
@@ -225,7 +216,7 @@ namespace Tensorflow.Operations
         public static Tensor local_response_normalization(Tensor input, int depth_radius = 5, int bias = 1,
             int alpha = 1, float beta = 0.5f, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("LRN", name: name, args: new
+            var _op = tf.OpDefLib._apply_op_helper("LRN", name: name, args: new
             {
                 input,
                 depth_radius,
@@ -238,14 +229,7 @@ namespace Tensorflow.Operations
         }
 
         public static Tensor log_softmax(Tensor logits, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("LogSoftmax", name: name, args: new
-            {
-                logits
-            });
-
-            return _op.output;
-        }
+            => tf.Context.ExecuteOp("LogSoftmax", name, new ExecuteOpArgs(logits));
 
         /// <summary>
         /// Says whether the targets are in the top `K` predictions.
@@ -257,7 +241,7 @@ namespace Tensorflow.Operations
         /// <returns>A `Tensor` of type `bool`.</returns>
         public static Tensor in_top_kv2(Tensor predictions, Tensor targets, int k, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("InTopKV2", name: name, args: new
+            var _op = tf.OpDefLib._apply_op_helper("InTopKV2", name: name, args: new
             {
                 predictions,
                 targets,
@@ -268,15 +252,8 @@ namespace Tensorflow.Operations
         }
 
         public static Tensor leaky_relu(Tensor features, float alpha = 0.2f, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("LeakyRelu", name: name, args: new
-            {
-                features,
-                alpha
-            });
-
-            return _op.output;
-        }
+            => tf.Context.ExecuteOp("LeakyRelu", name,
+                new ExecuteOpArgs(features).SetAttributes(new { alpha }));
 
         public static Tensor max_pool(Tensor input,
             int[] ksize,
@@ -284,39 +261,29 @@ namespace Tensorflow.Operations
             string padding,
             string data_format = "NHWC",
             string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("MaxPool", name: name, args: new
-            {
-                input,
-                ksize,
-                strides,
-                padding,
-                data_format,
-            });
+                => tf.Context.ExecuteOp("MaxPool", name, new ExecuteOpArgs(input)
+                    .SetAttributes(new
+                    {
+                        ksize,
+                        strides,
+                        padding,
+                        data_format
+                    }));
 
-            return _op.outputs[0];
-        }
-
-        public static Tensor max_pool_grad(Tensor orig_input, Tensor orig_output, Tensor grad, int[] ksize, int[] strides, string padding, 
-            string data_format= "NHWC", string name= null)
-        {
-            var _op = _op_def_lib._apply_op_helper("MaxPoolGrad", name: name, args: new
-            {
-                orig_input,
-                orig_output,
-                grad,
-                ksize,
-                strides,
-                padding,
-                data_format
-            });
-
-            return _op.outputs[0];
-        }
+        public static Tensor max_pool_grad(Tensor orig_input, Tensor orig_output, Tensor grad, int[] ksize, int[] strides, string padding,
+            string data_format = "NHWC", string name = null)
+                => tf.Context.ExecuteOp("MaxPoolGrad", name, new ExecuteOpArgs(orig_input, orig_output, grad)
+                    .SetAttributes(new
+                    {
+                        ksize,
+                        strides,
+                        padding,
+                        data_format
+                    }));
 
         public static Tensor[] top_kv2(Tensor input, int k, bool sorted = true, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("TopKV2", name: name, args: new
+            var _op = tf.OpDefLib._apply_op_helper("TopKV2", name: name, args: new
             {
                 input,
                 k,
@@ -327,37 +294,14 @@ namespace Tensorflow.Operations
         }
 
         public static Tensor relu_grad(Tensor gradients, Tensor features, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("ReluGrad", name: name, args: new
-            {
-                gradients,
-                features
-            });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("ReluGrad", name, new ExecuteOpArgs(gradients, features));
 
         public static Tensor leaky_relu_grad(Tensor gradients, Tensor features, float alpha = 0.2f, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("LeakyReluGrad", name: name, args: new
-            {
-                gradients,
-                features,
-                alpha
-            });
-
-            return _op.output;
-        }
+            => tf.Context.ExecuteOp("LeakyReluGrad", name, new ExecuteOpArgs(gradients, features)
+                .SetAttributes(new { alpha }));
 
         public static Tensor softmax(Tensor logits, string name = null)
-        {
-            var _op = _op_def_lib._apply_op_helper("Softmax", name: name, args: new
-            {
-                logits
-            });
-
-            return _op.outputs[0];
-        }
+            => tf.Context.ExecuteOp("Softmax", name, new ExecuteOpArgs(logits));
 
         /// <summary>
         /// Computes softmax cross entropy cost and gradients to backpropagate.
@@ -368,13 +312,9 @@ namespace Tensorflow.Operations
         /// <returns></returns>
         public static (Tensor, Tensor) softmax_cross_entropy_with_logits(Tensor features, Tensor labels, string name = null)
         {
-            var _op = _op_def_lib._apply_op_helper("SoftmaxCrossEntropyWithLogits", name: name, args: new
-            {
-                features,
-                labels
-            });
+            var results = tf.Context.ExecuteOp("SoftmaxCrossEntropyWithLogits", name, new ExecuteOpArgs(features, labels));
 
-            return (_op.outputs[0], _op.outputs[1]);
+            return (results[0], results[1]);
         }
 
         /// <summary>
@@ -406,11 +346,9 @@ namespace Tensorflow.Operations
         /// </remarks>
         public static (Tensor loss, Tensor backprop) sparse_softmax_cross_entropy_with_logits(Tensor features, Tensor labels, string name = "SparseSoftmaxCrossEntropyWithLogits")
         {
-            var op = _op_def_lib._apply_op_helper("SparseSoftmaxCrossEntropyWithLogits", name: name, args: new { features, labels });
-            int _idx = 0;
-            var loss = op.outputs[_idx++];
-            var backprop = op.outputs[_idx++];
-            return (loss, backprop);
+            var results = tf.Context.ExecuteOp("SparseSoftmaxCrossEntropyWithLogits", name, new ExecuteOpArgs(features, labels));
+
+            return (results[0], results[1]);
         }
 
         /// <summary>
@@ -420,51 +358,9 @@ namespace Tensorflow.Operations
         /// <param name="name">A name for the operation (optional).</param>
         /// <returns>A `Tensor`. Has the same type as `features`.</returns>
         public static Tensor relu(Tensor features, string name = null)
-        {
+            => tf.Context.ExecuteOp("Relu", name, new ExecuteOpArgs(features));
 
-            //_ctx = _context._context
-            //if _ctx is not None and _ctx._eager_context.is_eager:
-            //  try:
-            //    _result = _pywrap_tensorflow.TFE_Py_FastPathExecute(
-            //      _ctx._context_handle, _ctx._eager_context.device_name, "Relu", name,
-            //      _ctx._post_execution_callbacks, features)
-            //    return _result
-            //  except _core._FallbackException:
-            //    try:
-            //      return relu_eager_fallback(
-            //          features, name=name, ctx=_ctx)
-            //    except _core._SymbolicException:
-            //      pass  # Add nodes to the TensorFlow graph.
-            //    except (TypeError, ValueError):
-            //      result = _dispatch.dispatch(
-            //            relu, features=features, name=name)
-            //      if result is not _dispatch.OpDispatcher.NOT_SUPPORTED:
-            //        return result
-            //      raise
-            //  except _core._NotOkStatusException as e:
-            //    if name is not None:
-            //      message = e.message + " name: " + name
-            //    else:
-            //      message = e.message
-            //    _six.raise_from(_core._status_to_exception(e.code, message), None)
-            //# Add nodes to the TensorFlow graph.
-            //try:
-            OpDefLibrary _op_def_lib = new OpDefLibrary();
-            var _op = _op_def_lib._apply_op_helper("Relu", name: name, args: new { features });
-            return _op.outputs[0];
-            //except (TypeError, ValueError):
-            //  result = _dispatch.dispatch(
-            //        relu, features=features, name=name)
-            //  if result is not _dispatch.OpDispatcher.NOT_SUPPORTED:
-            //    return result
-            //  raise
-            // var _result = _op.outputs.ToArray();
-            //_inputs_flat = _op.inputs
-            //_attrs = ("T", _op.get_attr("T"))
-            //_execute.record_gradient(
-            //    "Relu", _inputs_flat, _attrs, _result, name)
-            //_result, = _result
-            // return _result;
-        }
+        public static Tensor tanh(Tensor x, string name = null)
+            => tf.Context.ExecuteOp("Tanh", name, new ExecuteOpArgs(x));
     }
 }

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text;
-using Google.Protobuf;
+﻿using Google.Protobuf;
 
 namespace Tensorflow
 {
@@ -34,8 +30,8 @@ namespace Tensorflow
                     inputs_string,
                     outputs_string,
                     transforms_string,
-                    buffer,
-                    status);
+                    buffer.Handle,
+                    status.Handle);
 
                 status.Check(false);
                 var bytes = buffer.ToArray();

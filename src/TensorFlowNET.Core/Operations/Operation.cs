@@ -14,13 +14,9 @@
    limitations under the License.
 ******************************************************************************/
 
-using Google.Protobuf.Collections;
-#if SERIALIZABLE
-using Newtonsoft.Json;
-#endif
+using NumSharp;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Tensorflow.Util;
 using static Tensorflow.Binding;
@@ -51,37 +47,24 @@ namespace Tensorflow
 
         private readonly Graph _graph;
         private NodeDef _node_def;
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
+
         public string type => OpType;
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
+
         public Graph graph => _graph;
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
+
         public int _id => _id_value;
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
+
         public int _id_value { get; set; }
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
         public Operation op => this;
         public TF_DataType dtype => TF_DataType.DtInvalid;
-        public string name => _handle == IntPtr.Zero ? null : c_api.StringPiece(c_api.TF_OperationName(_handle));
+        public virtual string name => _handle == IntPtr.Zero ? null : c_api.StringPiece(c_api.TF_OperationName(_handle));
         public string OpType => _handle == IntPtr.Zero ? null : c_api.StringPiece(c_api.TF_OperationOpType(_handle));
+
         public string Device => _handle == IntPtr.Zero ? null : c_api.StringPiece(c_api.TF_OperationDevice(_handle));
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
+
         bool _is_stateful;
-#if SERIALIZABLE
-        [JsonIgnore]
-#endif
+        public OperationDescription OpDesc { get; set; }
+
         public NodeDef node_def
         {
             get
@@ -151,7 +134,6 @@ namespace Tensorflow
         public Operation(NodeDef node_def, Graph g, Tensor[] inputs = null, TF_DataType[] output_types = null, ITensorOrOperation[] control_inputs = null, TF_DataType[] input_types = null, string original_op = "", OpDef op_def = null)
         {
             _graph = g;
-
             // Build the list of control inputs.
             var control_input_ops = new List<Operation>();
             if (control_inputs != null)
@@ -186,8 +168,7 @@ namespace Tensorflow
             if (op_def == null)
                 op_def = g.GetOpDef(node_def.Op);
 
-            var grouped_inputs = _reconstruct_sequence_inputs(op_def, inputs, node_def.Attr);
-            _handle = ops._create_c_op(g, node_def, grouped_inputs, control_input_ops.ToArray());
+            (_handle, OpDesc) = ops._create_c_op(g, node_def, inputs, control_input_ops.ToArray(), op_def);
             _is_stateful = op_def.IsStateful;
 
             // Initialize self._outputs.
@@ -210,75 +191,73 @@ namespace Tensorflow
             ops._run_using_default_session(this, feed_dict, graph, session);
         }
 
-        private object[] _reconstruct_sequence_inputs(OpDef op_def, Tensor[] inputs, MapField<string, AttrValue> attrs)
-        {
-            var grouped_inputs = new List<object>();
-            int i = 0;
-            int input_len = 0;
-            bool is_sequence = false;
-            foreach (var input_arg in op_def.InputArg)
-            {
-                if (!string.IsNullOrEmpty(input_arg.NumberAttr))
-                {
-                    input_len = (int) attrs[input_arg.NumberAttr].I;
-                    is_sequence = true;
-                } else if (!string.IsNullOrEmpty(input_arg.TypeListAttr))
-                {
-                    input_len = attrs[input_arg.TypeListAttr].List.Type.Count;
-                    is_sequence = true;
-                } else
-                {
-                    input_len = 1;
-                    is_sequence = false;
-                }
-
-                if (is_sequence)
-                    grouped_inputs.Add(inputs.Skip(i).Take(input_len).ToArray());
-                else
-                    grouped_inputs.Add(inputs[i]);
-
-                i += input_len;
-            }
-
-            return grouped_inputs.ToArray();
-        }
-
-        public T get_attr<T>(string name)
+        public virtual T get_attr<T>(string name)
             => (T)get_attr(name);
 
-        public object get_attr(string name)
+        public virtual T[] get_attr_list<T>(string name)
         {
+            if (tf.executing_eagerly())
+                return (T[])get_attr(name);
+
             AttrValue x = null;
 
             lock (Locks.ProcessWide)
-                using (var status = new Status())
-                using (var buf = new Buffer())
-                {
-                    c_api.TF_OperationGetAttrValueProto(_handle, name, buf, status);
-                    status.Check(true);
+            {
+                using var buf = new Buffer();
+                c_api.TF_OperationGetAttrValueProto(_handle, name, buf.Handle, tf.Status.Handle);
+                tf.Status.Check(true);
 
-                    x = AttrValue.Parser.ParseFrom(buf.MemoryBlock.Stream());
-                }
+                x = AttrValue.Parser.ParseFrom(buf.DangerousMemoryBlock.Stream());
+            }
 
             string oneof_value = x.ValueCase.ToString();
             if (string.IsNullOrEmpty(oneof_value))
                 return null;
 
-            if (oneof_value == "list")
-                throw new NotImplementedException($"Unsupported field type in {x.ToString()}");
+            switch (typeof(T).Name)
+            {
+                case nameof(Int32):
+                    return x.List.I.Select(x => (T)Convert.ChangeType(x, typeof(T))).ToArray();
+                case nameof(Int64):
+                    return x.List.I.Select(x => (T)Convert.ChangeType(x, typeof(T))).ToArray();
+                default:
+                    return null;
+            }
+        }
 
-            if (oneof_value == "type")
-                return x.Type;
+        public virtual object get_attr(string name)
+        {
+            AttrValue x = null;
 
-            object result = x.GetType().GetProperty(oneof_value).GetValue(x);
-            if (result is Google.Protobuf.ByteString byteString)
-                return byteString.ToStringUtf8();
-            return result;
+            lock (Locks.ProcessWide)
+            {
+                using var buf = new Buffer();
+                c_api.TF_OperationGetAttrValueProto(_handle, name, buf.Handle, tf.Status.Handle);
+                tf.Status.Check(true);
+
+                x = AttrValue.Parser.ParseFrom(buf.DangerousMemoryBlock.Stream());
+            }
+
+            string oneof_value = x.ValueCase.ToString();
+            if (string.IsNullOrEmpty(oneof_value))
+                return null;
+
+            switch (oneof_value.ToLower())
+            {
+                case "list":
+                    throw new NotImplementedException($"Unsupported field type in {oneof_value}");
+                case "type":
+                    return x.Type;
+                case "s":
+                    return x.S.ToStringUtf8();
+                default:
+                    return x.GetType().GetProperty(oneof_value).GetValue(x);
+            }
         }
 
         public TF_AttrMetadata GetAttributeMetadata(string attr_name, Status s)
         {
-            return c_api.TF_OperationGetAttrMetadata(_handle, attr_name, s);
+            return c_api.TF_OperationGetAttrMetadata(_handle, attr_name, s.Handle);
         }
 
         private NodeDef GetNodeDef()
@@ -287,10 +266,10 @@ namespace Tensorflow
                 using (var s = new Status())
                 using (var buffer = new Buffer())
                 {
-                    c_api.TF_OperationToNodeDef(_handle, buffer, s);
+                    c_api.TF_OperationToNodeDef(_handle, buffer.Handle, s.Handle);
                     s.Check();
 
-                    return NodeDef.Parser.ParseFrom(buffer.MemoryBlock.Stream());
+                    return NodeDef.Parser.ParseFrom(buffer.DangerousMemoryBlock.Stream());
                 }
         }
 
@@ -310,15 +289,16 @@ namespace Tensorflow
 
             // Reset cached inputs.
             _inputs_val = null;
+            _node_def = null;
             // after the c_api call next time _inputs is accessed 
             // the updated inputs are reloaded from the c_api
             lock (Locks.ProcessWide)
-                using (var status = new Status())
-                {
-                    c_api.UpdateEdge(_graph, output, input, status);
-                    //var updated_inputs = inputs;
-                    status.Check();
-                }
+            {
+                // disable
+                // c_api.TF_UpdateEdge(_graph, output, input, tf.Status.Handle);
+                //var updated_inputs = inputs;
+                tf.Status.Check();
+            }
         }
 
         private void _assert_same_graph(Tensor tensor)
@@ -341,5 +321,7 @@ namespace Tensorflow
         {
             return new TF_Input(op, input_idx);
         }
+
+        public NDArray numpy() => throw new NotImplementedException("");
     }
 }

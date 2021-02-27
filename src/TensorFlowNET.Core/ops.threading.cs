@@ -1,5 +1,4 @@
 ﻿using System.Threading;
-using Tensorflow.Util;
 using static Tensorflow.Binding;
 
 namespace Tensorflow
@@ -119,16 +118,10 @@ namespace Tensorflow
         /// </summary>
         /// <returns></returns>
         public static Graph get_default_graph()
-        {
-            //return _default_graph_stack.get_default()
-            return default_graph_stack.get_controller();
-        }
+            => default_graph_stack.get_default();
 
-        public static Graph set_default_graph(Graph graph)
-        {
-            default_graph_stack.set_controller(graph);
-            return default_graph_stack.get_controller();
-        }
+        public static Graph set_default_graph(Graph g)
+            => default_graph_stack.get_controller(g);
 
         /// <summary>
         ///     Clears the default graph stack and resets the global default graph.
@@ -148,5 +141,11 @@ namespace Tensorflow
             //                                    "exit the nesting and create a new graph.");
             default_graph_stack.reset();
         }
+
+        public static Graph peak_default_graph()
+            => default_graph_stack.peak_controller();
+
+        public static void pop_graph()
+            => default_graph_stack.pop();
     }
 }

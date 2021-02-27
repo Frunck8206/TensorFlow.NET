@@ -43,15 +43,15 @@ namespace Tensorflow {
             "ckxpc3RCBwoFdmFsdWUikgEKDE5hbWVBdHRyTGlzdBIMCgRuYW1lGAEgASgJ",
             "EjAKBGF0dHIYAiADKAsyIi50ZW5zb3JmbG93Lk5hbWVBdHRyTGlzdC5BdHRy",
             "RW50cnkaQgoJQXR0ckVudHJ5EgsKA2tleRgBIAEoCRIkCgV2YWx1ZRgCIAEo",
-            "CzIVLnRlbnNvcmZsb3cuQXR0clZhbHVlOgI4AUJvChhvcmcudGVuc29yZmxv",
-            "dy5mcmFtZXdvcmtCD0F0dHJWYWx1ZVByb3Rvc1ABWj1naXRodWIuY29tL3Rl",
-            "bnNvcmZsb3cvdGVuc29yZmxvdy90ZW5zb3JmbG93L2dvL2NvcmUvZnJhbWV3",
-            "b3Jr+AEBYgZwcm90bzM="));
+            "CzIVLnRlbnNvcmZsb3cuQXR0clZhbHVlOgI4AUKDAQoYb3JnLnRlbnNvcmZs",
+            "b3cuZnJhbWV3b3JrQg9BdHRyVmFsdWVQcm90b3NQAVpRZ2l0aHViLmNvbS90",
+            "ZW5zb3JmbG93L3RlbnNvcmZsb3cvdGVuc29yZmxvdy9nby9jb3JlL2ZyYW1l",
+            "d29yay9hdHRyX3ZhbHVlX2dvX3Byb3Rv+AEBYgZwcm90bzM="));
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { global::Tensorflow.TensorReflection.Descriptor, global::Tensorflow.TensorShapeReflection.Descriptor, global::Tensorflow.TypesReflection.Descriptor, },
-          new pbr::GeneratedClrTypeInfo(null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.AttrValue), global::Tensorflow.AttrValue.Parser, new[]{ "S", "I", "F", "B", "Type", "Shape", "Tensor", "List", "Func", "Placeholder" }, new[]{ "Value" }, null, new pbr::GeneratedClrTypeInfo[] { new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.AttrValue.Types.ListValue), global::Tensorflow.AttrValue.Types.ListValue.Parser, new[]{ "S", "I", "F", "B", "Type", "Shape", "Tensor", "Func" }, null, null, null)}),
-            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.NameAttrList), global::Tensorflow.NameAttrList.Parser, new[]{ "Name", "Attr" }, null, null, new pbr::GeneratedClrTypeInfo[] { null, })
+          new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.AttrValue), global::Tensorflow.AttrValue.Parser, new[]{ "S", "I", "F", "B", "Type", "Shape", "Tensor", "List", "Func", "Placeholder" }, new[]{ "Value" }, null, null, new pbr::GeneratedClrTypeInfo[] { new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.AttrValue.Types.ListValue), global::Tensorflow.AttrValue.Types.ListValue.Parser, new[]{ "S", "I", "F", "B", "Type", "Shape", "Tensor", "Func" }, null, null, null, null)}),
+            new pbr::GeneratedClrTypeInfo(typeof(global::Tensorflow.NameAttrList), global::Tensorflow.NameAttrList.Parser, new[]{ "Name", "Attr" }, null, null, null, new pbr::GeneratedClrTypeInfo[] { null, })
           }));
     }
     #endregion
@@ -192,7 +192,7 @@ namespace Tensorflow {
     /// </summary>
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public global::Tensorflow.DataType Type {
-      get { return valueCase_ == ValueOneofCase.Type ? (global::Tensorflow.DataType) value_ : 0; }
+      get { return valueCase_ == ValueOneofCase.Type ? (global::Tensorflow.DataType) value_ : global::Tensorflow.DataType.DtInvalid; }
       set {
         value_ = value;
         valueCase_ = ValueOneofCase.Type;
@@ -923,7 +923,7 @@ namespace Tensorflow {
     /// <summary>Field number for the "attr" field.</summary>
     public const int AttrFieldNumber = 2;
     private static readonly pbc::MapField<string, global::Tensorflow.AttrValue>.Codec _map_attr_codec
-        = new pbc::MapField<string, global::Tensorflow.AttrValue>.Codec(pb::FieldCodec.ForString(10), pb::FieldCodec.ForMessage(18, global::Tensorflow.AttrValue.Parser), 18);
+        = new pbc::MapField<string, global::Tensorflow.AttrValue>.Codec(pb::FieldCodec.ForString(10, ""), pb::FieldCodec.ForMessage(18, global::Tensorflow.AttrValue.Parser), 18);
     private readonly pbc::MapField<string, global::Tensorflow.AttrValue> attr_ = new pbc::MapField<string, global::Tensorflow.AttrValue>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     public pbc::MapField<string, global::Tensorflow.AttrValue> Attr {

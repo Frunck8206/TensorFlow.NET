@@ -14,7 +14,6 @@
    limitations under the License.
 ******************************************************************************/
 
-using System;
 using System.Runtime.InteropServices;
 
 namespace Tensorflow
@@ -27,7 +26,7 @@ namespace Tensorflow
                                       string inputs_string,
                                       string outputs_string,
                                       string transforms_string,
-                                      IntPtr output_buffer,
-                                      IntPtr status);
+                                      SafeBufferHandle output_buffer,
+                                      SafeStatusHandle status);
     }
 }

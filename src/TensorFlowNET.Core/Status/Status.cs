@@ -17,6 +17,7 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
+using Tensorflow.Util;
 using static Tensorflow.c_api;
 
 namespace Tensorflow
@@ -25,27 +26,45 @@ namespace Tensorflow
     /// TF_Status holds error information. It either has an OK code, or
     /// else an error code with an associated error message.
     /// </summary>
-    public class Status : DisposableObject
+    public sealed class Status : IDisposable
     {
         /// <summary>
         /// Error message
         /// </summary>
-        public string Message => c_api.StringPiece(TF_Message(_handle));
+        public string Message
+        {
+            get
+            {
+                using (Handle.Lease())
+                {
+                    return StringPiece(TF_Message(Handle));
+                }
+            }
+        }
 
         /// <summary>
         /// Error code
         /// </summary>
-        public TF_Code Code => TF_GetCode(_handle);
+        public TF_Code Code => TF_GetCode(Handle);
+
+        public SafeStatusHandle Handle { get; }
 
         public Status()
         {
-            _handle = TF_NewStatus();
+            Handle = TF_NewStatus();
+        }
+
+        public Status(SafeStatusHandle handle)
+        {
+            Handle = handle ?? throw new ArgumentNullException(nameof(handle));
         }
 
         public void SetStatus(TF_Code code, string msg)
         {
-            TF_SetStatus(_handle, code, msg);
+            TF_SetStatus(Handle, code, msg);
         }
+
+        public bool ok() => Code == TF_Code.TF_OK;
 
         /// <summary>
         /// Check status 
@@ -58,16 +77,27 @@ namespace Tensorflow
         {
             if (Code != TF_Code.TF_OK)
             {
-                Console.WriteLine(Message);
+                var message = Message;
+
                 if (throwException)
-                    throw new TensorflowException(Message);
+                {
+                    switch (Code)
+                    {
+                        case TF_Code.TF_OUT_OF_RANGE:
+                            throw new OutOfRangeError(message);
+                        case TF_Code.TF_INVALID_ARGUMENT:
+                            throw new InvalidArgumentError(message);
+                        default:
+                            throw new TensorflowException(message);
+                    }
+                }
             }
         }
 
-        public static implicit operator IntPtr(Status status)
-            => status._handle;
+        public void Dispose()
+            => Handle.Dispose();
 
-        protected override void DisposeUnmanagedResources(IntPtr handle)
-            => TF_DeleteStatus(handle);
+        public override string ToString()
+            => $"{Code} 0x{Handle.DangerousGetHandle():x16}";
     }
 }

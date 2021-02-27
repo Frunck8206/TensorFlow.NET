@@ -74,7 +74,7 @@ namespace Tensorflow.Summaries
         /// <summary>
         /// Adds keys to a collection.
         /// </summary>
-        /// <param name="val"The value to add per each key.></param>
+        /// <param name="val">The value to add per each key.</param>
         /// <param name="collections">A collection of keys to add.</param>
         /// <param name="default_collections">Used if collections is None.</param>
         public void collect(ITensorOrOperation val, List<string> collections, List<string> default_collections)
@@ -90,13 +90,13 @@ namespace Tensorflow.Summaries
             string scope_base_name = string.IsNullOrEmpty(family) ? name : $"{family}/{name}";
             return tf_with(ops.name_scope(scope_base_name, default_name: default_name, values), scope =>
             {
-                var tag = scope._name_scope;
+                var tag = scope.scope_name;
                 if (string.IsNullOrEmpty(family))
                     tag = tag.Remove(tag.Length - 1);
                 else
                     tag = $"{family}/{tag.Remove(tag.Length - 1)}";
 
-                return (tag, scope._name_scope);
+                return (tag, scope.scope_name);
             });
         }
     }

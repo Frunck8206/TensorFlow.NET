@@ -24,21 +24,14 @@ namespace Tensorflow
         public GraphTransformer graph_transforms => new GraphTransformer();
         public GraphKeys GraphKeys { get; } = new GraphKeys();
 
-        public void reset_default_graph() 
+        public void reset_default_graph()
             => ops.reset_default_graph();
 
         public Graph get_default_graph()
-        {
-            return ops.get_default_graph();
-        }
+            => ops.get_default_graph();
 
-        /// <summary>
-        ///     Equivalent to <see cref="get_default_graph"/> but does not create a new graph if it there is none.
-        /// </summary>
         public Graph peak_default_graph()
-        {
-            return ops.default_graph_stack.peak_controller();
-        }
+            => ops.peak_default_graph();
 
         /// <summary>
         ///     Creates a new graph.

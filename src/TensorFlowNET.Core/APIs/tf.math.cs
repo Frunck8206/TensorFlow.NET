@@ -14,12 +14,48 @@
    limitations under the License.
 ******************************************************************************/
 
-using Tensorflow.Operations;
-
 namespace Tensorflow
 {
     public partial class tensorflow
     {
+        public MathApi math { get; } = new MathApi();
+        public class MathApi
+        {
+            public Tensor log(Tensor x, string name = null)
+                => gen_math_ops.log(x, name);
+
+            /// <summary>
+            /// Computes the Gauss error function of `x` element-wise.
+            /// </summary>
+            /// <param name="x"></param>
+            /// <param name="name"></param>
+            /// <returns></returns>
+            public Tensor erf(Tensor x, string name = null)
+                => math_ops.erf(x, name);
+
+            /// <summary>
+            /// 
+            /// </summary>
+            /// <param name="arr"></param>
+            /// <param name="weights"></param>
+            /// <param name="minlength"></param>
+            /// <param name="maxlength"></param>
+            /// <param name="dtype"></param>
+            /// <param name="name"></param>
+            /// <param name="axis"></param>
+            /// <param name="binary_output"></param>
+            /// <returns></returns>
+            public Tensor bincount(Tensor arr, Tensor weights = null,
+                Tensor minlength = null,
+                Tensor maxlength = null,
+                TF_DataType dtype = TF_DataType.TF_INT32,
+                string name = null,
+                TensorShape axis = null,
+                bool binary_output = false)
+                => math_ops.bincount(arr, weights: weights, minlength: minlength, maxlength: maxlength,
+                    dtype: dtype, name: name, axis: axis, binary_output: binary_output);
+        }
+
         public Tensor abs(Tensor x, string name = null)
             => math_ops.abs(x, name);
 
@@ -41,7 +77,10 @@ namespace Tensorflow
         public Tensor asin(Tensor x, string name = null)
             => gen_math_ops.asin(x, name);
 
-        public Tensor add<Tx, Ty>(Tx a, Ty b, string name = null) 
+        public Tensor add(Tensor a, Tensor b, string name = null)
+            => gen_math_ops.add(a, b, name: name);
+
+        public Tensor add<Tx, Ty>(Tx a, Ty b, string name = null)
             => gen_math_ops.add(a, b, name: name);
 
         /// <summary>
@@ -110,6 +149,9 @@ namespace Tensorflow
         public Tensor cos(Tensor x, string name = null)
             => gen_math_ops.cos(x, name);
 
+        public Tensor cos(float x, string name = null)
+            => gen_math_ops.cos(x, name);
+
         /// <summary>
         /// Computes hyperbolic cosine of x element-wise.
         /// </summary>
@@ -159,7 +201,7 @@ namespace Tensorflow
             => gen_math_ops.greater_equal(x, y, name);
 
         /// <summary>
-        /// Returns the truth value of (x < y) element-wise.
+        /// Returns the truth value of (x &lt; y) element-wise.
         /// </summary>
         /// <typeparam name="Tx"></typeparam>
         /// <typeparam name="Ty"></typeparam>
@@ -180,7 +222,7 @@ namespace Tensorflow
             => gen_math_ops.lgamma(x, name: name);
 
         /// <summary>
-        /// Returns the truth value of (x <= y) element-wise.
+        /// Returns the truth value of (x &lt;= y) element-wise.
         /// </summary>
         /// <typeparam name="Tx"></typeparam>
         /// <typeparam name="Ty"></typeparam>
@@ -203,6 +245,9 @@ namespace Tensorflow
         public Tensor logical_and(Tensor x, Tensor y, string name = null)
             => gen_math_ops.logical_and(x, y, name);
 
+        public Tensor logical_and(bool x, bool y, string name = null)
+            => gen_math_ops.logical_and(x, y, name);
+
         public Tensor logical_not(Tensor x, string name = null)
             => gen_math_ops.logical_not(x, name);
 
@@ -222,7 +267,7 @@ namespace Tensorflow
         /// <returns></returns>
         public Tensor _clip_by_value(Tensor t, Tensor clip_value_min, Tensor clip_value_max, string name = null)
             => gen_math_ops._clip_by_value(t, clip_value_min, clip_value_max);
-        
+
         /// <summary>
         ///    Clips tensor values to a specified min and max.
         /// </summary>
@@ -250,17 +295,16 @@ namespace Tensorflow
         ///    Any values less than <c>clip_value_min</c> are set to <c>clip_value_min</c>. Any values
         ///    greater than <c>clip_value_max</c> are set to <c>clip_value_max</c>.
         /// </remarks>
-        public Tensor clip_by_value (Tensor t, Tensor clip_value_min, Tensor clip_value_max, string name = "ClipByValue") 
+        public Tensor clip_by_value<T1, T2>(Tensor t, T1 clip_value_min, T2 clip_value_max, string name = "ClipByValue")
             => clip_ops.clip_by_value(t, clip_value_min, clip_value_max, name);
-        
+
         public Tensor sub<Tx, Ty>(Tx a, Ty b, string name = null)
             => gen_math_ops.sub(a, b, name: name);
 
-
         public Tensor divide(Tensor a, Tensor b)
-            => gen_math_ops.real_div(a, b);
+            => a / b;
 
-        public Tensor sqrt(Tensor a, string name = null) 
+        public Tensor sqrt(Tensor a, string name = null)
             => gen_math_ops.sqrt(a, name);
 
         public Tensor sign(Tensor a, string name = null)
@@ -268,6 +312,16 @@ namespace Tensorflow
 
         public Tensor subtract<T>(Tensor x, T[] y, string name = null) where T : struct
             => gen_math_ops.sub(x, ops.convert_to_tensor(y, dtype: x.dtype.as_base_dtype(), name: "y"), name);
+
+        /// <summary>
+        /// return x - y
+        /// </summary>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public Tensor subtract(Tensor x, Tensor y, string name = null)
+            => gen_math_ops.sub(x, y, name);
 
         public Tensor log(Tensor x, string name = null)
             => gen_math_ops.log(x, name);
@@ -324,7 +378,7 @@ namespace Tensorflow
             => gen_math_ops.maximum(x, y, name: name);
 
         /// <summary>
-        /// Returns the min of x and y (i.e. x < y ? x : y) element-wise.
+        /// Returns the min of x and y (i.e. x &lt; y ? x : y) element-wise.
         /// </summary>
         /// <typeparam name="T1"></typeparam>
         /// <typeparam name="T2"></typeparam>
@@ -335,8 +389,20 @@ namespace Tensorflow
         public Tensor minimum<T1, T2>(T1 x, T2 y, string name = null)
             => gen_math_ops.minimum(x, y, name: name);
 
-        public Tensor multiply<Tx, Ty>(Tx x, Ty y) 
-            => gen_math_ops.mul(x, y);
+        public Tensor multiply(Tensor x, Tensor y, string name = null)
+            => gen_math_ops.mul(x, y, name: name);
+
+        /// <summary>
+        /// return x * y
+        /// </summary>
+        /// <typeparam name="Tx"></typeparam>
+        /// <typeparam name="Ty"></typeparam>
+        /// <param name="x"></param>
+        /// <param name="y"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public Tensor multiply<Tx, Ty>(Tx x, Ty y, string name = null)
+            => gen_math_ops.mul(x, y, name: name);
 
         public Tensor negative(Tensor x, string name = null)
             => gen_math_ops.neg(x, name);
@@ -364,8 +430,8 @@ namespace Tensorflow
         public Tensor divide<T>(Tensor x, T[] y, string name = null) where T : struct
             => x / ops.convert_to_tensor(y, dtype: x.dtype.as_base_dtype(), name: "y");
 
-        public Tensor pow<T1, T2>(T1 x, T2 y) 
-            => gen_math_ops.pow(x, y);
+        public Tensor pow<T1, T2>(T1 x, T2 y, string name = "pow")
+            => math_ops.pow(x, y, name: name);
 
         /// <summary>
         /// Divides `x / y` elementwise, rounding toward the most negative integer.
@@ -389,6 +455,9 @@ namespace Tensorflow
 
         public Tensor range(object start, object limit = null, object delta = null, TF_DataType dtype = TF_DataType.DtInvalid, string name = "range")
             => math_ops.range(start, limit: limit, delta: delta, dtype: dtype, name: name);
+
+        public Tensor real(Tensor input, string name = null)
+            => math_ops.real(input, name);
 
         /// <summary>
         /// Computes the "logical or" of elements across dimensions of a tensor.
@@ -429,10 +498,21 @@ namespace Tensorflow
         /// <summary>
         /// Computes the sum of elements across dimensions of a tensor.
         /// </summary>
+        /// <param name="input_tensors"></param>
+        /// <param name="axis"></param>
+        /// <param name="keepdims"></param>
+        /// <param name="name"></param>
+        /// <returns></returns>
+        public Tensor reduce_sum(Tensor[] input_tensors, int? axis = null, bool keepdims = false, string name = null)
+            => math_ops.reduce_sum(input_tensors, axis: axis, keepdims: keepdims, name: name);
+
+        /// <summary>
+        /// Computes the sum of elements across dimensions of a tensor.
+        /// </summary>
         /// <param name="input"></param>
         /// <param name="axis"></param>
         /// <returns></returns>
-        public Tensor reduce_sum(Tensor input, int? axis = null, int? reduction_indices = null, 
+        public Tensor reduce_sum(Tensor input, int? axis = null, int? reduction_indices = null,
             bool keepdims = false, string name = null)
         {
             if (!axis.HasValue && reduction_indices.HasValue && !keepdims)
@@ -445,7 +525,7 @@ namespace Tensorflow
                 return math_ops.reduce_sum(input, keepdims: keepdims, name: name);
         }
 
-        public Tensor reduce_sum(Tensor input, TensorShape axis, int? reduction_indices = null, 
+        public Tensor reduce_sum(Tensor input, TensorShape axis, int? reduction_indices = null,
             bool keepdims = false, string name = null)
             => math_ops.reduce_sum(input, axis, keepdims: keepdims, name: name);
 
@@ -466,11 +546,20 @@ namespace Tensorflow
         public Tensor reduce_min(Tensor input_tensor, int[] axis = null, bool keepdims = false, string name = null)
             => math_ops.reduce_min(input_tensor, axis, keepdims, name);
 
+        public Tensor reduce_std(Tensor input_tensor, int[] axis = null, bool keepdims = false, string name = null)
+            => math_ops.reduce_std(input_tensor, axis, keepdims, name);
+
+        public Tensor reduce_variance(Tensor input_tensor, int[] axis = null, bool keepdims = false, string name = null)
+            => math_ops.reduce_variance(input_tensor, axis, keepdims, name);
+
         public Tensor sigmoid<T>(T x, string name = null)
             => math_ops.sigmoid(x, name: name);
 
         public Tensor sum(Tensor input, int axis, bool keep_dims = false, string name = null)
             => gen_math_ops._sum(input, axis, keep_dims: keep_dims, name: name);
+
+        public Tensor reduce_mean(Tensor input_tensors, int axis, bool keepdims = false, string name = null)
+            => math_ops.reduce_mean(input_tensors, axis: new[] { axis }, keepdims: keepdims, name: name);
 
         public Tensor reduce_mean(Tensor input_tensor, int[] axis = null, bool keepdims = false, string name = null, int? reduction_indices = null)
             => math_ops.reduce_mean(input_tensor, axis: axis, keepdims: keepdims, name: name, reduction_indices: reduction_indices);
@@ -481,7 +570,7 @@ namespace Tensorflow
         public Tensor round(Tensor x, string name = null)
             => gen_math_ops.round(x, name: name);
 
-        public Tensor cast(Tensor x, TF_DataType dtype = TF_DataType.DtInvalid, string name = null) 
+        public Tensor cast(Tensor x, TF_DataType dtype = TF_DataType.DtInvalid, string name = null)
             => math_ops.cast(x, dtype, name);
 
         public Tensor cumsum(Tensor x, int axis = 0, bool exclusive = false, bool reverse = false, string name = null)
@@ -492,5 +581,7 @@ namespace Tensorflow
 
         public Tensor square(Tensor x, string name = null)
             => gen_math_ops.square(x, name: name);
+        public Tensor squared_difference(Tensor x, Tensor y, string name = null)
+            => gen_math_ops.squared_difference(x: x, y: y, name: name);
     }
 }
